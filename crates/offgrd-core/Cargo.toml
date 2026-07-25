@@ -1,0 +1,18 @@
+[package]
+name = "offgrd-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+offgrd-common = { path = "../offgrd-common" }
+tokio.workspace = true
+async-trait.workspace = true
+anyhow.workspace = true
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde_json.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "test-util"] }
+tempfile = "3"
