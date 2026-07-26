@@ -1,0 +1,66 @@
+name: CI
+
+# Runs on every push and PR. Two jobs:
+# - `windows`: the real target platform — builds and tests the whole
+#   workspace, including the Windows-only crates (offgrd-cli's
+#   platform/etw code).
+# - `cross-platform-check`: a fast sanity check on Linux for the parts
+#   of the workspace that don't need Windows (offgrd-common,
+#   offgrd-core, offgrd-rules, and offgrd-cli's non-Windows stub path)
+#   — catches accidental Windows-only assumptions leaking into
+#   supposedly-portable crates early, without needing a Windows runner
+#   for quick iteration.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  windows:
+    name: Build & test (Windows, real target)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust (pinned via rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry & build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo build (release)
+        run: cargo build --workspace --release
+
+      - name: cargo test
+        run: cargo test --workspace
+
+  cross-platform-check:
+    name: Cross-platform sanity check (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo build (workspace, non-Windows subset compiles too)
+        run: cargo build --workspace
+
+      - name: cargo test (offgrd-common, offgrd-core, offgrd-rules are fully OS-agnostic)
+        run: cargo test --workspace

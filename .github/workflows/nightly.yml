@@ -1,0 +1,36 @@
+name: Nightly build
+
+# Builds a debug/dev artifact every night from `main`, mainly so there's
+# always a fresh binary to grab without asking someone to build it
+# locally. Deliberately NOT signed and NOT the release pipeline — see
+# `release.yml` (not written yet, see WIP.md/ROADMAP) for the real,
+# signed release process this will grow into.
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC daily
+  workflow_dispatch: {} # allow manual trigger from the Actions tab
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  nightly:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --workspace --release
+
+      - name: Upload nightly artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: offgrd-dog-nightly-${{ github.sha }}
+          path: target/release/offgrd.exe
+          retention-days: 14

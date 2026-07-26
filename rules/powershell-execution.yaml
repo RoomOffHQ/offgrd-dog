@@ -1,0 +1,15 @@
+id: powershell-execution
+title: PowerShell execution detected
+description: >
+  Fires on any process whose image path is powershell.exe. Deliberately
+  broad/noisy as a starter example — PowerShell itself is completely
+  legitimate; this is meant to be refined (e.g. combined with
+  command-line conditions once ETW-sourced events populate
+  command_line) rather than used as-is in a real deployment.
+severity: Info
+mitre_attack_id: T1059.001
+references:
+  - https://attack.mitre.org/techniques/T1059/001/
+condition:
+  category: Process
+  image_path_contains: powershell.exe

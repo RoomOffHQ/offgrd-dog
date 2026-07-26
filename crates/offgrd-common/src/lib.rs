@@ -13,8 +13,10 @@
 //! by the (eventual) kernel-mode FFI boundary without pulling in a
 //! heavy dependency tree.
 
+pub mod alert;
 pub mod event;
 pub mod process;
 
+pub use alert::Alert;
 pub use event::{Event, EventCategory, EventPayload, EventSource, Severity};
 pub use process::ProcessRef;

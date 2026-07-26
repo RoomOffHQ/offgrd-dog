@@ -1,0 +1,15 @@
+[package]
+name = "offgrd-rules"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+offgrd-common = { path = "../offgrd-common" }
+serde.workspace = true
+serde_yaml.workspace = true
+uuid.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

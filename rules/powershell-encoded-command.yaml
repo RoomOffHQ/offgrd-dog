@@ -1,0 +1,18 @@
+id: powershell-encoded-command
+title: PowerShell executed with an encoded command
+description: >
+  -EncodedCommand/-enc lets PowerShell run a Base64-encoded script
+  block, which is extremely common in living-off-the-land attacks
+  because it evades simple string-matching on suspicious command
+  text. Requires command_line to be populated, which currently only
+  the ETW collector (`offgrd watch`) provides — the Toolhelp32
+  snapshot collector (`offgrd ps`) does not, so this rule will never
+  fire against `offgrd ps` output today. See WIP.md.
+severity: Medium
+mitre_attack_id: T1059.001
+references:
+  - https://attack.mitre.org/techniques/T1059/001/
+condition:
+  category: Process
+  image_path_contains: powershell.exe
+  command_line_contains: "-enc"

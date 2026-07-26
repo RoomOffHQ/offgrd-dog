@@ -1,0 +1,23 @@
+# CODEOWNERS
+#
+# Higher blast-radius code (anything touching raw Windows APIs,
+# unsafe blocks, or the future kernel driver) is scoped to a smaller,
+# higher-trust reviewer set than lower-risk code (rules, docs, CLI
+# plumbing). Replace @offgrd-dog/* placeholders with real GitHub
+# usernames/teams once the project has actual maintainers.
+
+# Default: any core maintainer can review
+*                                   @offgrd-dog/maintainers
+
+# Windows API / unsafe-code-adjacent: higher-trust review required
+/crates/offgrd-cli/src/platform/    @offgrd-dog/windows-api-reviewers
+/crates/offgrd-cli/src/etw_collector.rs  @offgrd-dog/windows-api-reviewers
+
+# Future kernel driver crate, once it exists: strictest review tier
+# /crates/offgrd-driver/            @offgrd-dog/kernel-reviewers
+
+# Detection rules: security-content reviewers (may differ from code reviewers)
+/rules/                             @offgrd-dog/detection-engineers
+
+# Docs/architecture: lower barrier, anyone with write access can review
+/docs/                              @offgrd-dog/maintainers

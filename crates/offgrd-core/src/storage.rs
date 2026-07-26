@@ -58,6 +58,17 @@ impl EventStore {
             );
             CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp_utc);
             CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);
+
+            CREATE TABLE IF NOT EXISTS alerts (
+                id                   TEXT PRIMARY KEY,
+                timestamp_utc        TEXT NOT NULL,
+                rule_id              TEXT NOT NULL,
+                rule_title           TEXT NOT NULL,
+                severity             TEXT NOT NULL,
+                triggering_event_id  TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp_utc);
+            CREATE INDEX IF NOT EXISTS idx_alerts_rule_id ON alerts(rule_id);
             ",
         )
         .context("failed to initialize event store schema")?;
@@ -135,6 +146,78 @@ impl EventStore {
         }
 
         Ok(events)
+    }
+
+    /// Persists a single alert. Idempotent on `id`, same rationale as
+    /// `insert` for events.
+    pub fn insert_alert(&self, alert: &offgrd_common::Alert) -> Result<()> {
+        let conn = self.conn.lock().expect("event store mutex poisoned");
+        conn.execute(
+            "INSERT OR IGNORE INTO alerts (id, timestamp_utc, rule_id, rule_title, severity, triggering_event_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![
+                alert.id.to_string(),
+                alert.timestamp.to_rfc3339(),
+                alert.rule_id,
+                alert.rule_title,
+                severity_label(alert.severity),
+                alert.triggering_event_id.to_string(),
+            ],
+        )
+        .context("failed to insert alert")?;
+        Ok(())
+    }
+
+    /// Total number of stored alerts.
+    pub fn alert_count(&self) -> Result<i64> {
+        let conn = self.conn.lock().expect("event store mutex poisoned");
+        let count: i64 = conn.query_row("SELECT COUNT(*) FROM alerts", [], |row| row.get(0))?;
+        Ok(count)
+    }
+
+    /// Returns the `limit` most recent alerts, newest first.
+    pub fn recent_alerts(&self, limit: i64) -> Result<Vec<offgrd_common::Alert>> {
+        let conn = self.conn.lock().expect("event store mutex poisoned");
+        let mut stmt = conn.prepare(
+            "SELECT id, timestamp_utc, rule_id, rule_title, severity, triggering_event_id
+             FROM alerts ORDER BY timestamp_utc DESC LIMIT ?1",
+        )?;
+
+        let rows = stmt.query_map([limit], |row| {
+            let id: String = row.get(0)?;
+            let timestamp_utc: String = row.get(1)?;
+            let rule_id: String = row.get(2)?;
+            let rule_title: String = row.get(3)?;
+            let severity: String = row.get(4)?;
+            let triggering_event_id: String = row.get(5)?;
+            Ok((
+                id,
+                timestamp_utc,
+                rule_id,
+                rule_title,
+                severity,
+                triggering_event_id,
+            ))
+        })?;
+
+        let mut alerts = Vec::new();
+        for row in rows {
+            let (id, timestamp_utc, rule_id, rule_title, severity, triggering_event_id) = row?;
+            alerts.push(offgrd_common::Alert {
+                id: id.parse().context("stored alert id is not a valid UUID")?,
+                timestamp: timestamp_utc
+                    .parse::<chrono::DateTime<chrono::Utc>>()
+                    .context("stored alert timestamp is not valid RFC3339")?,
+                rule_id,
+                rule_title,
+                severity: parse_severity(&severity)?,
+                triggering_event_id: triggering_event_id
+                    .parse()
+                    .context("stored triggering_event_id is not a valid UUID")?,
+            });
+        }
+
+        Ok(alerts)
     }
 }
 
@@ -306,5 +389,50 @@ mod tests {
 
         let reopened = EventStore::open(&path).expect("reopen on-disk store");
         assert_eq!(reopened.count().unwrap(), 1);
+    }
+
+    fn sample_alert(triggering_event_id: uuid::Uuid) -> offgrd_common::Alert {
+        offgrd_common::Alert::new(
+            "test-rule",
+            "Test rule title",
+            Severity::Medium,
+            triggering_event_id,
+        )
+    }
+
+    #[test]
+    fn insert_and_count_alerts() {
+        let store = EventStore::open_in_memory().expect("open store");
+        assert_eq!(store.alert_count().unwrap(), 0);
+
+        let event = sample_event();
+        store.insert(&event).expect("insert event");
+        store.insert_alert(&sample_alert(event.id)).expect("insert alert");
+
+        assert_eq!(store.alert_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn inserting_same_alert_id_twice_is_idempotent() {
+        let store = EventStore::open_in_memory().expect("open store");
+        let alert = sample_alert(uuid::Uuid::new_v4());
+
+        store.insert_alert(&alert).expect("first insert");
+        store.insert_alert(&alert).expect("second insert (same id)");
+
+        assert_eq!(store.alert_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn recent_alerts_round_trips() {
+        let store = EventStore::open_in_memory().expect("open store");
+        let alert = sample_alert(uuid::Uuid::new_v4());
+        store.insert_alert(&alert).expect("insert");
+
+        let recent = store.recent_alerts(10).expect("query recent alerts");
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].id, alert.id);
+        assert_eq!(recent[0].rule_id, alert.rule_id);
+        assert_eq!(recent[0].severity, alert.severity);
     }
 }

@@ -11,6 +11,7 @@ path = "src/main.rs"
 [dependencies]
 offgrd-common = { path = "../offgrd-common" }
 offgrd-core = { path = "../offgrd-core" }
+offgrd-rules = { path = "../offgrd-rules" }
 clap.workspace = true
 anyhow.workspace = true
 chrono.workspace = true

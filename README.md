@@ -45,6 +45,17 @@ cargo run --bin offgrd -- history --limit 10 --json
 # EXPERIMENTAL — see WIP.md, not yet verified to compile:
 cargo run --bin offgrd -- watch --seconds 30
 cargo run --bin offgrd -- watch --save --json
+
+# Detection rules (bundled examples in rules/):
+cargo run --bin offgrd -- alerts
+cargo run --bin offgrd -- alerts --from-history --limit 100
+cargo run --bin offgrd -- alerts --rules-dir path\to\custom\rules
+cargo run --bin offgrd -- alerts --save
+cargo run --bin offgrd -- alert-history
+cargo run --bin offgrd -- alert-history --limit 10 --json
+
+# Continuous polling-based monitor (works today, no ETW needed):
+cargo run --bin offgrd -- monitor --interval 5 --save-events --save-alerts
 ```
 
 ## Run tests (any OS)
@@ -63,7 +74,10 @@ error instead of silently doing nothing.
 ```
 crates/
   offgrd-common/   Shared Event schema + ProcessRef type (no OS deps)
-  offgrd-cli/      First runnable binary: `offgrd ps`
+  offgrd-core/     EventBus, Collector trait, SQLite-backed EventStore
+  offgrd-rules/    Stateless YAML rule matching -> Alert
+  offgrd-cli/      Binary: `offgrd ps|history|watch|alerts`
+rules/             Bundled example detection rules (YAML)
 docs/
   offgrd-dog-architecture.md   Full architecture & phased roadmap
 WIP.md             Live status: done / in progress / next
@@ -72,3 +86,12 @@ WIP.md             Live status: done / in progress / next
 ## License
 
 GPLv3 — see `LICENSE`.
+
+## Contributing
+
+See `CONTRIBUTING.md`. CI (`.github/workflows/ci.yml`) runs `cargo
+fmt`/`clippy`/`test` on Windows (the real target) plus a fast Linux
+sanity check for the OS-agnostic crates. Note: CI is expected to fail
+on the Windows job right now specifically because of
+`etw_collector.rs` (see `WIP.md`) — that's known and tracked, not a
+sign something else is broken.

@@ -11,6 +11,7 @@
 mod collector;
 #[cfg(windows)]
 mod etw_collector;
+mod monitor;
 mod platform;
 
 use anyhow::Result;
@@ -74,6 +75,52 @@ enum Command {
         #[arg(long)]
         save: bool,
     },
+    /// Evaluate detection rules against events and print matches.
+    Alerts {
+        /// Directory containing *.yaml/*.yml rule files.
+        #[arg(long, default_value = "rules")]
+        rules_dir: String,
+
+        /// Evaluate against previously stored events (--db) instead of
+        /// taking a fresh process snapshot.
+        #[arg(long)]
+        from_history: bool,
+
+        /// With --from-history, how many recent events to evaluate.
+        #[arg(long, default_value_t = 200)]
+        limit: i64,
+
+        /// Persist matched alerts to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
+    /// Show previously stored alerts from the event store (--db).
+    AlertHistory {
+        /// Maximum number of alerts to show, most recent first.
+        #[arg(long, default_value_t = 50)]
+        limit: i64,
+    },
+    /// Continuously watch for process start/stop by polling at a fixed
+    /// interval (no ETW/admin rights needed — see `watch` for the
+    /// higher-fidelity, still-experimental ETW-based alternative).
+    /// Runs until Ctrl+C.
+    Monitor {
+        /// Poll interval in seconds.
+        #[arg(long, default_value_t = 5)]
+        interval: u64,
+
+        /// Directory containing *.yaml/*.yml rule files.
+        #[arg(long, default_value = "rules")]
+        rules_dir: String,
+
+        /// Persist observed start/stop events to the event store (--db).
+        #[arg(long)]
+        save_events: bool,
+
+        /// Persist triggered alerts to the event store (--db).
+        #[arg(long)]
+        save_alerts: bool,
+    },
 }
 
 #[tokio::main]
@@ -84,7 +131,143 @@ async fn main() -> Result<()> {
         Command::Ps { tree, save } => run_ps(cli.json, tree, save, &cli.db).await,
         Command::History { limit } => run_history(cli.json, limit, &cli.db),
         Command::Watch { seconds, save } => run_watch(cli.json, seconds, save, &cli.db).await,
+        Command::Alerts {
+            rules_dir,
+            from_history,
+            limit,
+            save,
+        } => run_alerts(cli.json, &rules_dir, from_history, limit, save, &cli.db).await,
+        Command::AlertHistory { limit } => run_alert_history(cli.json, limit, &cli.db),
+        Command::Monitor {
+            interval,
+            rules_dir,
+            save_events,
+            save_alerts,
+        } => {
+            monitor::run(monitor::MonitorConfig {
+                interval: std::time::Duration::from_secs(interval),
+                rules_dir,
+                save_events,
+                save_alerts,
+                db_path: cli.db,
+                json: cli.json,
+            })
+            .await
+        }
     }
+}
+
+fn run_alert_history(json: bool, limit: i64, db_path: &str) -> Result<()> {
+    let store = EventStore::open(db_path)?;
+    let alerts = store.recent_alerts(limit)?;
+
+    if alerts.is_empty() {
+        eprintln!("no alerts stored in {db_path} yet — try `offgrd alerts --save` first");
+        return Ok(());
+    }
+
+    if json {
+        for alert in &alerts {
+            println!("{}", serde_json::to_string(alert)?);
+        }
+        return Ok(());
+    }
+
+    println!(
+        "{:<24}  {:<8}  {:<28}  RULE",
+        "TIMESTAMP (UTC)", "SEVERITY", "RULE ID"
+    );
+    for alert in &alerts {
+        println!(
+            "{:<24}  {:<8}  {:<28}  {}",
+            alert.timestamp.format("%Y-%m-%d %H:%M:%S"),
+            format!("{:?}", alert.severity),
+            alert.rule_id,
+            alert.rule_title,
+        );
+    }
+
+    Ok(())
+}
+
+/// Loads rules from `rules_dir` and evaluates them either against a
+/// fresh process snapshot (default — same collector `ps` uses) or
+/// against previously stored history (`--from-history`).
+async fn run_alerts(
+    json: bool,
+    rules_dir: &str,
+    from_history: bool,
+    limit: i64,
+    save: bool,
+    db_path: &str,
+) -> Result<()> {
+    let ruleset = offgrd_rules::RuleSet::load_dir(rules_dir)?;
+    if ruleset.is_empty() {
+        eprintln!("offgrd: no rules loaded from '{rules_dir}' (missing directory or no *.yaml files) — nothing to evaluate.");
+        return Ok(());
+    }
+    eprintln!("offgrd: loaded {} rule(s) from '{rules_dir}'", ruleset.len());
+
+    let events: Vec<Event> = if from_history {
+        let store = EventStore::open(db_path)?;
+        store.recent(limit)?
+    } else {
+        let bus = EventBus::new();
+        let mut subscription = bus.subscribe();
+        let collector = ProcessSnapshotCollector;
+        collector.run(&bus).await?;
+
+        let mut events = Vec::new();
+        loop {
+            match subscription.try_recv() {
+                Ok(event) => events.push(event),
+                Err(TryRecvError::Empty) | Err(TryRecvError::Closed) => break,
+                Err(TryRecvError::Lagged(_)) => continue,
+            }
+        }
+        events
+    };
+
+    let alerts = ruleset.evaluate_all(&events);
+
+    if save && !alerts.is_empty() {
+        let store = EventStore::open(db_path)?;
+        for alert in &alerts {
+            store.insert_alert(alert)?;
+        }
+        eprintln!("offgrd: saved {} alert(s) to {db_path}", alerts.len());
+    }
+
+    if alerts.is_empty() {
+        eprintln!(
+            "offgrd: evaluated {} event(s), no rules matched.",
+            events.len()
+        );
+        return Ok(());
+    }
+
+    if json {
+        for alert in &alerts {
+            println!("{}", serde_json::to_string(alert)?);
+        }
+        return Ok(());
+    }
+
+    println!(
+        "{:<24}  {:<8}  {:<28}  RULE",
+        "TIMESTAMP (UTC)", "SEVERITY", "RULE ID"
+    );
+    for alert in &alerts {
+        println!(
+            "{:<24}  {:<8}  {:<28}  {}",
+            alert.timestamp.format("%Y-%m-%d %H:%M:%S"),
+            format!("{:?}", alert.severity),
+            alert.rule_id,
+            alert.rule_title,
+        );
+    }
+
+    Ok(())
 }
 
 #[cfg(windows)]
