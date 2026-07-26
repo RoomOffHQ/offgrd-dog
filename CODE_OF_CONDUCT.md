@@ -23,11 +23,10 @@ appearance.
 
 ## Enforcement
 
-Violations can be reported privately to the maintainers (see
-`SECURITY.md` for a contact placeholder — a dedicated conduct contact
-will be published once the project has a real maintainer team).
-Maintainers will investigate and respond proportionally, up to and
-including permanent bans from project spaces.
+Violations can be reported privately to the maintainers at
+**security@offgrd.online** (see `SECURITY.md`). Maintainers will
+investigate and respond proportionally, up to and including permanent
+bans from project spaces.
 
 ## Attribution
 

@@ -44,11 +44,28 @@
         </button>
       </nav>
 
+      <div class="mode-switcher" id="mode-switcher">
+        <div class="mode-switcher-label">Monitoring posture</div>
+        <div class="mode-options">
+          <button class="mode-option" data-mode="normal">
+            <span class="mode-dot mode-dot-normal"></span> Normal
+          </button>
+          <button class="mode-option" data-mode="moderate">
+            <span class="mode-dot mode-dot-moderate"></span> Moderate
+          </button>
+          <button class="mode-option" data-mode="paranoid">
+            <span class="mode-dot mode-dot-paranoid"></span> Paranoid
+          </button>
+        </div>
+      </div>
+
       <div class="sidebar-footer">
         <div class="status-dot" id="connection-dot"></div>
         <span id="connection-label">Ready</span>
       </div>
     </aside>
+
+    <div id="toast-container"></div>
 
     <main class="content">
       <!-- DASHBOARD -->
@@ -75,6 +92,14 @@
             <div class="card-label">Rules loaded</div>
             <div class="card-value" id="stat-rules">—</div>
           </div>
+        </div>
+
+        <div class="panel threat-panel">
+          <div class="panel-title">Threat Level</div>
+          <div class="threat-gauge">
+            <div class="threat-gauge-fill" id="threat-gauge-fill"></div>
+          </div>
+          <div class="threat-gauge-label" id="threat-gauge-label">No alerts observed yet — looking calm.</div>
         </div>
 
         <div class="panel">

@@ -43,6 +43,10 @@ function stubFor(command) {
     case "list_services":
     case "list_certificates":
       return [];
+    case "get_monitoring_mode":
+      return "normal";
+    case "set_monitoring_mode":
+      return null;
     case "get_dashboard_summary":
       return {
         process_count: 0,
@@ -592,6 +596,21 @@ function setupLiveEvents() {
     renderAlertTable(liveAlerts);
     bumpLiveCounter("alert");
     flashConnectionDot();
+    recordSeverityForThreatGauge(alert.severity);
+    showToast({
+      severity: alert.severity,
+      title: `Alert: ${alert.rule_title}`,
+      body: alert.rule_id,
+    });
+  });
+
+  tauriEvent.listen("offgrd://activity", (evt) => {
+    const notice = evt.payload;
+    showToast({
+      severity: "info",
+      title: "Paranoid scan activity",
+      body: notice.message,
+    });
   });
 }
 
@@ -611,6 +630,128 @@ function flashConnectionDot() {
   }, 400);
 }
 
+// ---------- Monitoring mode switcher ----------
+
+async function setMonitoringMode(mode) {
+  document.querySelectorAll(".mode-option").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.mode === mode);
+  });
+  try {
+    await callBackend("set_monitoring_mode", { mode });
+    showToast({
+      severity: "info",
+      title: `Monitoring posture: ${mode[0].toUpperCase()}${mode.slice(1)}`,
+      body: modeDescription(mode),
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function modeDescription(mode) {
+  switch (mode) {
+    case "normal":
+      return "Background monitoring is off. Everything runs on demand only.";
+    case "moderate":
+      return "Live process monitoring every 10s.";
+    case "paranoid":
+      return "Fast process monitoring (3s) plus periodic full-spectrum scans across network, autoruns, services, and certificates.";
+    default:
+      return "";
+  }
+}
+
+async function setupModeSwitcher() {
+  document.querySelectorAll(".mode-option").forEach((btn) => {
+    btn.addEventListener("click", () => setMonitoringMode(btn.dataset.mode));
+  });
+
+  try {
+    const current = await callBackend("get_monitoring_mode");
+    const mode = typeof current === "string" ? current : "normal";
+    document.querySelectorAll(".mode-option").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.mode === mode);
+    });
+  } catch (err) {
+    console.warn("[offgrd-gui] could not fetch current monitoring mode", err);
+    document.querySelector('.mode-option[data-mode="normal"]')?.classList.add("active");
+  }
+}
+
+// ---------- Toast notifications ----------
+
+function showToast({ severity, title, body }) {
+  const container = document.getElementById("toast-container");
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${(severity || "info").toLowerCase()}`;
+  toast.innerHTML = `
+    <div class="toast-title">${escapeHtml(title)}</div>
+    <div class="toast-body">${escapeHtml(body || "")}</div>
+  `;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add("toast-leaving");
+    setTimeout(() => toast.remove(), 220);
+  }, 5000);
+}
+
+// ---------- Threat gauge ----------
+
+// Rolling window of recent alert severities (in-memory only, resets
+// on app restart) used purely to drive the dashboard's Threat Level
+// gauge — a quick "how spicy has it been lately" visual, not a
+// scored/validated risk metric.
+const recentSeverities = [];
+const THREAT_WINDOW = 50;
+
+function recordSeverityForThreatGauge(severity) {
+  recentSeverities.push((severity || "info").toLowerCase());
+  if (recentSeverities.length > THREAT_WINDOW) recentSeverities.shift();
+  updateThreatGauge();
+}
+
+function updateThreatGauge() {
+  const fill = document.getElementById("threat-gauge-fill");
+  const label = document.getElementById("threat-gauge-label");
+  if (!fill || !label) return;
+
+  if (recentSeverities.length === 0) {
+    fill.style.width = "4%";
+    label.textContent = "No alerts observed yet — looking calm.";
+    return;
+  }
+
+  const weights = { info: 5, low: 20, medium: 45, high: 75, critical: 100 };
+  const avg =
+    recentSeverities.reduce((sum, s) => sum + (weights[s] ?? 20), 0) / recentSeverities.length;
+
+  fill.style.width = `${Math.min(100, Math.round(avg))}%`;
+
+  if (avg < 20) label.textContent = "Low — mostly informational activity.";
+  else if (avg < 45) label.textContent = "Moderate — some low/medium severity alerts recently.";
+  else if (avg < 75) label.textContent = "Elevated — medium/high severity alerts recently. Worth a look.";
+  else label.textContent = "High — high/critical severity alerts recently. Investigate the Alerts page.";
+}
+
+// ---------- Keyboard shortcuts ----------
+
+function setupKeyboardShortcuts() {
+  const viewOrder = ["dashboard", "processes", "alerts", "network", "autoruns", "services", "certificates", "rules"];
+  document.addEventListener("keydown", (e) => {
+    // Don't hijack shortcuts while the user is typing in a search box.
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+      if (e.key === "Escape") e.target.blur();
+      return;
+    }
+
+    const num = parseInt(e.key, 10);
+    if (!Number.isNaN(num) && num >= 1 && num <= viewOrder.length) {
+      document.querySelector(`.nav-item[data-view="${viewOrder[num - 1]}"]`)?.click();
+    }
+  });
+}
+
 // ---------- Wire it all up ----------
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -618,6 +759,8 @@ document.addEventListener("DOMContentLoaded", () => {
   setupProcessTableSorting();
   setupProcessViewToggle();
   setupSimpleViews();
+  setupModeSwitcher();
+  setupKeyboardShortcuts();
 
   document.getElementById("refresh-dashboard").addEventListener("click", refreshDashboard);
   document.getElementById("refresh-processes").addEventListener("click", refreshProcesses);

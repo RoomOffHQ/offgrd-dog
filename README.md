@@ -2,6 +2,8 @@
 
 **Know Everything. Trust Nothing.**
 
+Website: [offgrid.online/dog](https://offgrid.online/dog)
+
 An open source Windows system-transparency / counter-surveillance
 platform. See `docs/offgrd-dog-architecture.md` for the full
 architecture and roadmap, and `WIP.md` for exactly what's implemented
@@ -24,6 +26,14 @@ navigation (Dashboard / Processes / Alerts / Rules), sortable/filterable
 process table, color-coded severity badges on alerts. It's a thin
 consumer of the same `offgrd-collectors`/`offgrd-core`/`offgrd-rules`
 crates the CLI uses — no separate detection logic.
+
+**Monitoring posture** (sidebar switcher): **Normal** (nothing runs in
+the background — on-demand only, the original behavior), **Moderate**
+(live process monitoring every 10s), **Paranoid** (process monitoring
+every 3s plus a periodic full-spectrum scan — network, autoruns,
+services, certificates — evaluated against every bundled rule).
+Switch anytime; takes effect on the next background tick, no restart
+needed.
 
 No npm/Node required: the frontend is plain HTML/CSS/JS served
 directly as Tauri's `distDir` (`withGlobalTauri: true` exposes

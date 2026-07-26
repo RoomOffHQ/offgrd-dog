@@ -155,6 +155,32 @@ expect problems, in rough order of how much I'd bet on each.
   risk than the collectors themselves, since it's only wiring
   already-written Rust collectors into already-proven GUI patterns —
   no new `unsafe` code in this round.
+- [x] **Monitoring modes + UX overhaul (NEW this round, user-requested)**:
+  - **Three monitoring postures** — Normal (nothing runs in the
+    background, fully on-demand — the original behavior), Moderate
+    (live process monitoring, 10s interval), Paranoid (3s process
+    monitoring PLUS a full-spectrum scan — network, autoruns,
+    services, certificates, all evaluated against every bundled rule —
+    every 10th tick, i.e. every ~30s). New `MonitoringMode` enum +
+    `MonitoringState` (a `Mutex` managed via Tauri's `State`), read
+    fresh every loop iteration in `live.rs` so switching modes in the
+    UI takes effect on the next tick without restarting the app. Two
+    new commands: `get_monitoring_mode`/`set_monitoring_mode`.
+  - **Mode switcher** in the sidebar — three buttons with distinct
+    colors (green/yellow/red) and a pulsing dot on Paranoid.
+  - **Toast notifications** — slide in top-right for every new alert
+    (color-coded by severity) and for Paranoid-mode scan activity.
+  - **Threat Level gauge** on the Dashboard — a rolling-window
+    severity-weighted average of recent alerts, purely a visual
+    "how spicy lately" indicator, not a validated risk score.
+  - **View transitions** (subtle fade+slide), **pulsing animation on
+    Critical/High severity badges**, **keyboard shortcuts** (1–8 to
+    jump between nav sections, Esc to blur a search box).
+  - This round's new `unsafe` risk is limited to `live.rs`'s
+    `run_full_spectrum_scan` (safe async orchestration of already-
+    existing collectors, no new raw pointer work) — the actual new
+    `unsafe` surface is zero; it's a consumer of the 4 collectors
+    already built.
 - [x] **`docs/collectors.md` (NEW this round)** — a consolidated
   per-collector reference (data source, exact payload schema,
   privilege requirements, known limitations, "how to add a new one"

@@ -23,7 +23,7 @@ use offgrd_collectors::ProcessSnapshotCollector;
 use offgrd_common::{Event, EventPayload};
 use offgrd_core::{Collector, EventBus, EventStore};
 use offgrd_rules::RuleSet;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use tokio::sync::broadcast::error::TryRecvError;
 
@@ -186,6 +186,60 @@ fn list_rules(
     let dir = rules_dir.unwrap_or_else(|| paths.rules_dir.clone());
     let ruleset = RuleSet::load_dir(&dir).map_err(|e| e.to_string())?;
     Ok(ruleset.rules().iter().map(rule_to_dto).collect())
+}
+
+/// The three monitoring intensity levels requested: Normal (fully
+/// on-demand, nothing runs in the background), Moderate (live process
+/// monitoring at a relaxed interval), Paranoid (fast process
+/// monitoring plus periodic full-spectrum scans — network, autoruns,
+/// services, certificates — with every bundled rule evaluated against
+/// all of it). `live.rs` reads this each loop iteration so switching
+/// modes takes effect on the next tick, no restart needed.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum MonitoringMode {
+    Normal,
+    Moderate,
+    Paranoid,
+}
+
+impl MonitoringMode {
+    /// How often the process-diff tick runs. `None` means "don't loop
+    /// at all" (Normal mode — the background task sleeps on a long
+    /// interval and just re-checks whether the mode has changed).
+    pub fn process_poll_interval(&self) -> Option<std::time::Duration> {
+        match self {
+            MonitoringMode::Normal => None,
+            MonitoringMode::Moderate => Some(std::time::Duration::from_secs(10)),
+            MonitoringMode::Paranoid => Some(std::time::Duration::from_secs(3)),
+        }
+    }
+
+    /// Only Paranoid mode runs the extra collectors (network,
+    /// autoruns, services, certificates) periodically in the
+    /// background — these are heavier and noisier, appropriate for
+    /// "I want to see everything" but not for a lighter-touch mode.
+    pub fn runs_full_spectrum_scans(&self) -> bool {
+        matches!(self, MonitoringMode::Paranoid)
+    }
+
+    /// How often the full-spectrum scan runs, in units of process-poll
+    /// ticks (e.g. 10 means "every 10th process-diff tick").
+    pub fn full_spectrum_scan_every_n_ticks(&self) -> u32 {
+        10
+    }
+}
+
+pub struct MonitoringState(pub std::sync::Mutex<MonitoringMode>);
+
+#[tauri::command]
+fn get_monitoring_mode(state: tauri::State<'_, MonitoringState>) -> MonitoringMode {
+    *state.0.lock().expect("monitoring mode mutex poisoned")
+}
+
+#[tauri::command]
+fn set_monitoring_mode(mode: MonitoringMode, state: tauri::State<'_, MonitoringState>) {
+    *state.0.lock().expect("monitoring mode mutex poisoned") = mode;
 }
 
 #[derive(Serialize, Clone)]
@@ -448,8 +502,10 @@ fn main() {
     tauri::Builder::default()
         .setup(|app| {
             let paths = AppPaths::resolve(&app.handle());
-            live::spawn(app.handle(), paths.clone());
-            app.manage(paths);
+            let monitoring_state = MonitoringState(std::sync::Mutex::new(MonitoringMode::Normal));
+            app.manage(paths.clone());
+            app.manage(monitoring_state);
+            live::spawn(app.handle(), paths);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -462,6 +518,8 @@ fn main() {
             list_autoruns,
             list_services,
             list_certificates,
+            get_monitoring_mode,
+            set_monitoring_mode,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OffGrd Dog GUI");
