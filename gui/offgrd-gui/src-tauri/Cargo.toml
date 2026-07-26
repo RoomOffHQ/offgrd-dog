@@ -1,0 +1,32 @@
+[package]
+name = "offgrd-gui"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-only"
+description = "OffGrd Dog — desktop GUI (Tauri)"
+
+# Deliberately its own Cargo.toml / Cargo.lock, NOT a member of the
+# root workspace: Tauri's build script + bundler have their own
+# assumptions about being built standalone, and keeping it separate
+# avoids that interacting with the CLI workspace's own release
+# profile / target dir. It still shares real code with the CLI via
+# ordinary path dependencies into ../../../crates/*.
+
+[build-dependencies]
+tauri-build = { version = "1", features = [] }
+
+[dependencies]
+tauri = { version = "1", features = ["shell-open"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros", "time"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+offgrd-common = { path = "../../../crates/offgrd-common" }
+offgrd-core = { path = "../../../crates/offgrd-core" }
+offgrd-rules = { path = "../../../crates/offgrd-rules" }
+offgrd-collectors = { path = "../../../crates/offgrd-collectors" }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

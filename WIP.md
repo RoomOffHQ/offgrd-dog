@@ -1,45 +1,98 @@
 # OffGrd Dog — Work In Progress
 
-Updated with every delivered chunk of code. Three sections only:
-**Done**, **In progress**, **Next**. Nothing here is aspirational
-beyond "Next" — if it's in "Done" it's real code in this zip.
+Per your instruction, this round was built end-to-end **assuming
+everything (including the still-unverified ETW collector) works,**
+without waiting for a compile/test pass. That means the "Done" list
+below is broader but less trustworthy than usual — treat all of it as
+"written, not yet compiled," not just the items previously flagged
+experimental. Real verification (yours) comes next; this file tells
+you exactly where to expect problems.
 
 ---
 
-## Done
+## Done (written this round and previously — see caveat above)
 
-- [x] Cargo workspace scaffolding
-- [x] `offgrd-common`: `Event`/`EventCategory`/`EventSource`/`Severity`/`EventPayload`/`ProcessRef`/`Alert` schema, tested
-- [x] `offgrd-core`: `EventBus`, `Collector` trait, `EventStore` (events + alerts, SQLite, tested)
-- [x] `offgrd-cli`: `ProcessSnapshotCollector`, `offgrd ps` [`--tree`][`--json`][`--save`], `offgrd history`
-- [x] `offgrd-rules`: `Rule`/`Condition`/`RuleSet`, tested; bundled example rules in `rules/`
-- [x] `offgrd-cli`: `offgrd alerts` [`--from-history`][`--save`], `offgrd alert-history`
-- [x] **`offgrd monitor`** (NEW this round, `crates/offgrd-cli/src/monitor.rs`) — continuous, polling-based process start/stop monitoring that works **today, with no dependency on the still-unverified ETW code**. Reuses the already-solid `ProcessSnapshotCollector` on a fixed interval (`--interval` seconds), diffs successive snapshots by pid set (first tick = baseline only, no false "everything just started" noise), evaluates the rule engine on each tick's diff, and can persist both events and alerts (`--save-events`, `--save-alerts`). Runs until Ctrl+C.
-- [x] `EtwProcessCollector` (`offgrd watch`) — still **experimental/unverified**, unchanged this round; `offgrd monitor` is not a replacement for it (different tradeoffs — see the module doc comment in `monitor.rs`), just a way to get real continuous monitoring shipped without waiting on ETW.
-- [x] Cross-platform stub so `cargo build`/`cargo test` succeed on Linux/macOS too
-- [x] **Open-source project scaffolding** (NEW this round, zero compilation risk — pure config/docs): `.github/workflows/ci.yml` (fmt + clippy + build + test, Windows job = real target, Linux job = fast sanity check for OS-agnostic crates), `.github/workflows/nightly.yml` (unsigned nightly build artifact), issue templates (bug report, feature request, detection rule), PR template, `CODEOWNERS` (kernel/unsafe-code-adjacent paths scoped to a stricter reviewer tier, per the original architecture doc's governance section), `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `rustfmt.toml`, `.editorconfig`.
+- [x] Everything from previous rounds: `offgrd-common`, `offgrd-core`
+  (bus + SQLite storage for events & alerts), `offgrd-rules`
+  (YAML rule engine + `load_dir_report` linting), bundled `rules/`,
+  `.github/` CI + governance scaffolding.
+- [x] **Major refactor (NEW): `offgrd-collectors` crate.** Moved
+  `ProcessSnapshotCollector`, `EtwProcessCollector`, and all the
+  Win32/ETW `platform` code out of `offgrd-cli` into a new shared
+  library crate, `crates/offgrd-collectors`. Reason: the GUI needs the
+  exact same collectors the CLI uses, and duplicating Win32/ETW code
+  between two binaries would be a maintenance trap and a correctness
+  risk (two copies to keep in sync). `offgrd-cli` and the new GUI both
+  depend on it now. **This is a real structural change, not just new
+  code** — `offgrd-cli`'s `main.rs`/`monitor.rs` imports were updated
+  accordingly, but this is exactly the kind of mechanical refactor
+  that's easy to get subtly wrong (a missed `use`, a path typo)
+  without a compiler checking it, so double-check this compiles first
+  if things break.
+- [x] **`gui/offgrd-gui`: a real Tauri desktop GUI (NEW).** Dark
+  theme, sidebar nav (Dashboard / Processes / Alerts / Rules),
+  sortable + filterable process table, color-coded severity badges,
+  live dashboard stats. Rust backend (`src-tauri/src/main.rs`) exposes
+  4 commands (`list_processes`, `run_alerts_scan`,
+  `get_alert_history`, `get_dashboard_summary`), all thin wrappers
+  around `offgrd-collectors`/`offgrd-core`/`offgrd-rules` — the GUI
+  has no detection logic of its own, same principle as the CLI.
+  Frontend is plain HTML/CSS/JS with **no npm/bundler step**
+  (`withGlobalTauri: true` exposes `window.__TAURI__.invoke`
+  directly) — this was a deliberate choice to minimize new build
+  tooling/failure surface, at the cost of not having a component
+  framework if the UI grows a lot more complex later.
 
-## In progress
+## Known gaps / things that will need fixing, flagged in advance
 
-- [ ] Nothing actively mid-flight in `monitor.rs` or the new `.github/` scaffolding.
-- [ ] **CI will currently fail on the Windows job** because of `etw_collector.rs` — this is expected, not a new problem. Once you (or CI, if you push this to a real GitHub repo) get a real Windows compiler error from it, that's exactly the signal needed to fix it. The Linux cross-platform-check job should pass since it doesn't touch Windows-only code.
-- [ ] `EtwProcessCollector` still needs your `cargo build` output before I can fix its API-signature guesses (unchanged blocker).
+- **Tauri version assumption**: backend uses Tauri v1's API shape
+  (`tauri::Builder`, `tauri.conf.json` schema, `tauri-build`). This is
+  the version I have the most confidence in from training data, but
+  it's not verified against whatever's actually current/installable
+  today — if `cargo install tauri-cli` pulls v2 by default now, the
+  config schema and some API names differ and this will need
+  adjusting. Pin explicitly if needed: `cargo install tauri-cli
+  --version "^1"` (already in the README).
+- **No app icons shipped.** `tauri.conf.json` references
+  `icons/icon.ico`, which doesn't exist in this zip. `cargo tauri dev`
+  may or may not tolerate that (uncertain); `cargo tauri build`
+  (installer packaging) definitely needs real icons. Generate them
+  before packaging: `cargo tauri icon path\to\a-1024x1024-icon.png`
+  (standard Tauri workflow, not a bug — just an asset I can't produce
+  offline).
+- **GUI's `DEFAULT_DB_PATH`/`DEFAULT_RULES_DIR` are relative paths**
+  (`"offgrd.db"`, `"rules"`), same simplification as the CLI — means
+  the GUI needs to be launched from the repo root (or wherever those
+  exist) to find them right now. A packaged installer needs a real
+  per-user data directory; not addressed yet.
+- **`offgrd-collectors`' Cargo.toml pulls in `ferrisetw` unconditionally
+  on Windows** (needed for the still-unverified ETW collector) even
+  though the GUI doesn't use `EtwProcessCollector` yet — meaning any
+  `ferrisetw` compile error will block the GUI build too, not just
+  `offgrd watch`. Worth knowing before you dig into an error there.
+- **No live-updating GUI yet** — Processes/Alerts are "click Refresh /
+  Scan now," not push-updated. A real live view needs a Tauri event
+  channel from a running collector to the frontend (`app.emit` +
+  `listen()` on the JS side), which is a reasonable next step but adds
+  more surface — deliberately not attempted this round given how much
+  is already unverified.
 
-## Explicitly deferred (with reasoning)
+## Next (once you've compiled and reported back)
 
-- **Exit codes on stop events from `monitor`**: polling can only observe that a pid disappeared, not *why* (clean exit vs. crash vs. killed) or its exit code — that information only exists at the moment of exit, which polling by definition misses. This is a real, structural limitation of polling vs. ETW, not an oversight; it's exactly the kind of gap the ETW collector is meant to close once it's verified working.
-- **Merging `monitor` and the future ETW daemon into one code path**: deliberately kept as two separate, independent implementations for now rather than one collector with a "polling vs. ETW" flag — premature to unify before ETW is even confirmed to compile.
-
-## Next (in the order we'll tackle them)
-
-1. **Fix `etw_collector.rs`** based on your `cargo build` output — unchanged top blocker for anything ETW-related.
-2. Once ETW works: decide whether `offgrd watch`/`monitor` merge into one collector-agnostic daemon command, or stay separate (polling as a no-admin-rights fallback, ETW as the high-fidelity default).
-3. **GUI shell (Tauri)**: after the above is stable.
+1. Fix whatever `cargo build --workspace` reports — expect issues
+   concentrated in three places, roughly in order of how much I'd
+   bet on them: (a) `offgrd-collectors`/`offgrd-cli` import paths from
+   the refactor, (b) `etw_collector.rs`'s `ferrisetw` API guesses
+   (unchanged risk from before), (c) the GUI's Tauri v1 API/config
+   assumptions.
+2. Real app icons + per-user data directory for the GUI.
+3. Live-updating GUI views via Tauri events, once the above is solid.
 
 ## How to report back
 
-Paste the exact `cargo build`/`cargo test` output. `monitor.rs` is new
-this round but built from patterns already proven elsewhere in the
-project — a compile error here would be a real bug on my end, same as
-`offgrd-rules` last round. `etw_collector.rs` remains the one place
-where I expect and need your error output specifically.
+Paste the exact `cargo build --workspace` output first (covers
+common/core/rules/collectors/cli). Then, separately,
+`cd gui\offgrd-gui\src-tauri && cargo build` (or `cargo tauri dev`)
+output for the GUI specifically, since it's a separate
+Cargo.toml/Cargo.lock from the main workspace. I'll patch based on
+real errors and re-deliver a full, updated zip — never a partial diff.

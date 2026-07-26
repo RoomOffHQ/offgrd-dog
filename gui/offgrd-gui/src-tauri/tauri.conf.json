@@ -1,0 +1,44 @@
+{
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "devPath": "../dist",
+    "distDir": "../dist",
+    "withGlobalTauri": true
+  },
+  "package": {
+    "productName": "OffGrd Dog",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "open": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "identifier": "org.offgrd-dog.gui",
+      "icon": [
+        "icons/icon.ico"
+      ],
+      "targets": ["msi", "nsis"]
+    },
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "title": "OffGrd Dog — Know Everything. Trust Nothing.",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 960,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "theme": "Dark"
+      }
+    ]
+  }
+}

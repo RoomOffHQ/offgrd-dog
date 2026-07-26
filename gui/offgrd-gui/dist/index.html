@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OffGrd Dog</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">OD</div>
+        <div class="brand-text">
+          <div class="brand-name">OffGrd Dog</div>
+          <div class="brand-tag">Know Everything. Trust Nothing.</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">◧</span> Dashboard
+        </button>
+        <button class="nav-item" data-view="processes">
+          <span class="nav-icon">▤</span> Processes
+        </button>
+        <button class="nav-item" data-view="alerts">
+          <span class="nav-icon">▲</span> Alerts
+        </button>
+        <button class="nav-item" data-view="rules">
+          <span class="nav-icon">≡</span> Rules
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-dot" id="connection-dot"></div>
+        <span id="connection-label">Ready</span>
+      </div>
+    </aside>
+
+    <main class="content">
+      <!-- DASHBOARD -->
+      <section class="view active" id="view-dashboard">
+        <header class="view-header">
+          <h1>Dashboard</h1>
+          <button class="btn btn-primary" id="refresh-dashboard">Refresh</button>
+        </header>
+
+        <div class="cards">
+          <div class="card">
+            <div class="card-label">Running processes</div>
+            <div class="card-value" id="stat-processes">—</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Stored events</div>
+            <div class="card-value" id="stat-events">—</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Stored alerts</div>
+            <div class="card-value" id="stat-alerts">—</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Rules loaded</div>
+            <div class="card-value" id="stat-rules">—</div>
+          </div>
+        </div>
+
+        <div class="panel" id="rule-errors-panel" style="display:none">
+          <div class="panel-title">⚠ Rule load errors</div>
+          <ul id="rule-errors-list" class="error-list"></ul>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">About this build</div>
+          <p class="muted">
+            This is an observability tool, not an antivirus: it never blocks,
+            quarantines, or modifies anything on its own. It surfaces facts.
+            See <code>WIP.md</code> in the repository for exactly what's
+            verified vs. experimental in the current build.
+          </p>
+        </div>
+      </section>
+
+      <!-- PROCESSES -->
+      <section class="view" id="view-processes">
+        <header class="view-header">
+          <h1>Processes</h1>
+          <div class="header-actions">
+            <input type="search" id="process-search" placeholder="Filter by image path or PID…" />
+            <button class="btn btn-primary" id="refresh-processes">Refresh</button>
+          </div>
+        </header>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-sort="pid">PID</th>
+                <th data-sort="ppid">PPID</th>
+                <th data-sort="image_path">Image path</th>
+                <th data-sort="command_line">Command line</th>
+              </tr>
+            </thead>
+            <tbody id="process-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load processes.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ALERTS -->
+      <section class="view" id="view-alerts">
+        <header class="view-header">
+          <h1>Alerts</h1>
+          <div class="header-actions">
+            <button class="btn" id="load-alert-history">Load history</button>
+            <button class="btn btn-primary" id="scan-now">Scan now</button>
+          </div>
+        </header>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Severity</th>
+                <th>Rule</th>
+                <th>Time</th>
+                <th>Event ID</th>
+              </tr>
+            </thead>
+            <tbody id="alert-table-body">
+              <tr><td colspan="4" class="empty-row">No alerts yet. Try "Scan now".</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- RULES -->
+      <section class="view" id="view-rules">
+        <header class="view-header">
+          <h1>Rules</h1>
+        </header>
+        <div class="panel">
+          <p class="muted">
+            Detection rules live as YAML files in the <code>rules/</code>
+            directory and are evaluated by the same
+            <code>offgrd-rules</code> engine the CLI uses (<code>offgrd
+            alerts</code> / <code>offgrd rules-check</code>). A dedicated
+            rule editor is planned — for now, edit the YAML files directly
+            and use "Scan now" on the Alerts page to test changes.
+          </p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -4,6 +4,7 @@ members = [
     "crates/offgrd-common",
     "crates/offgrd-core",
     "crates/offgrd-rules",
+    "crates/offgrd-collectors",
     "crates/offgrd-cli",
 ]
 

@@ -16,7 +16,7 @@
 //! mode can coexist: polling as a robust fallback / non-admin path,
 //! ETW as the higher-fidelity default.
 
-use crate::collector::ProcessSnapshotCollector;
+use offgrd_collectors::ProcessSnapshotCollector;
 use anyhow::Result;
 use offgrd_common::{Event, EventCategory, EventPayload, EventSource};
 use offgrd_core::{Collector, EventBus, EventStore};

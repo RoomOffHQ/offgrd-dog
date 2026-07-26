@@ -17,6 +17,32 @@ mentally, straightforward Win32 + SQLite). `offgrd watch` (live ETW
 process events) is a **first, unverified pass** — see `WIP.md` before
 relying on it; expect to need to fix `ferrisetw` API mismatches.
 
+## GUI (Tauri desktop app)
+
+A real desktop UI lives in `gui/offgrd-gui` — dark theme, sidebar
+navigation (Dashboard / Processes / Alerts / Rules), sortable/filterable
+process table, color-coded severity badges on alerts. It's a thin
+consumer of the same `offgrd-collectors`/`offgrd-core`/`offgrd-rules`
+crates the CLI uses — no separate detection logic.
+
+No npm/Node required: the frontend is plain HTML/CSS/JS served
+directly as Tauri's `distDir` (`withGlobalTauri: true` exposes
+`window.__TAURI__.invoke` with zero bundler step).
+
+```powershell
+cargo install tauri-cli --version "^1"
+cd gui\offgrd-gui\src-tauri
+cargo tauri dev
+```
+
+Before `cargo tauri build` (packaging an installer), generate real
+app icons from a source PNG — the repo doesn't ship pre-built icon
+files:
+
+```powershell
+cargo tauri icon path\to\a-1024x1024-icon.png
+```
+
 ## Build (Windows 10/11, requires network for the first build)
 
 ```powershell
@@ -56,6 +82,10 @@ cargo run --bin offgrd -- alert-history --limit 10 --json
 
 # Continuous polling-based monitor (works today, no ETW needed):
 cargo run --bin offgrd -- monitor --interval 5 --save-events --save-alerts
+
+# Lint all rule files, reporting every error in one pass:
+cargo run --bin offgrd -- rules-check
+cargo run --bin offgrd -- rules-check --rules-dir path\to\custom\rules
 ```
 
 ## Run tests (any OS)
@@ -73,14 +103,17 @@ error instead of silently doing nothing.
 
 ```
 crates/
-  offgrd-common/   Shared Event schema + ProcessRef type (no OS deps)
-  offgrd-core/     EventBus, Collector trait, SQLite-backed EventStore
-  offgrd-rules/    Stateless YAML rule matching -> Alert
-  offgrd-cli/      Binary: `offgrd ps|history|watch|alerts`
-rules/             Bundled example detection rules (YAML)
+  offgrd-common/     Shared Event/Alert schema + ProcessRef type (no OS deps)
+  offgrd-core/       EventBus, Collector trait, SQLite-backed EventStore
+  offgrd-rules/      Stateless YAML rule matching -> Alert
+  offgrd-collectors/ Shared collectors (Win32 process snapshot, ETW) - used by CLI and GUI
+  offgrd-cli/        Binary: `offgrd ps|history|watch|monitor|alerts|alert-history|rules-check`
+gui/
+  offgrd-gui/        Tauri desktop app (dark theme, dashboard/processes/alerts/rules)
+rules/               Bundled example detection rules (YAML)
 docs/
   offgrd-dog-architecture.md   Full architecture & phased roadmap
-WIP.md             Live status: done / in progress / next
+WIP.md               Live status: done / in progress / next
 ```
 
 ## License

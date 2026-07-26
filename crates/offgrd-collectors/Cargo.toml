@@ -1,0 +1,21 @@
+[package]
+name = "offgrd-collectors"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+offgrd-common = { path = "../offgrd-common" }
+offgrd-core = { path = "../offgrd-core" }
+anyhow.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Threading",
+    "Win32_Security",
+] }
+ferrisetw = "1.2"

@@ -8,15 +8,11 @@
 //! (network, registry, filesystem, ETW-based process monitoring) will
 //! plug into the same pipeline.
 
-mod collector;
-#[cfg(windows)]
-mod etw_collector;
 mod monitor;
-mod platform;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use collector::ProcessSnapshotCollector;
+use offgrd_collectors::ProcessSnapshotCollector;
 use offgrd_common::{Event, EventPayload};
 use offgrd_core::{Collector, EventBus, EventStore};
 use tokio::sync::broadcast::error::TryRecvError;
@@ -121,6 +117,13 @@ enum Command {
         #[arg(long)]
         save_alerts: bool,
     },
+    /// Lint every rule file in a directory and report which ones
+    /// failed to parse, without stopping at the first bad file.
+    RulesCheck {
+        /// Directory containing *.yaml/*.yml rule files.
+        #[arg(long, default_value = "rules")]
+        rules_dir: String,
+    },
 }
 
 #[tokio::main]
@@ -154,7 +157,33 @@ async fn main() -> Result<()> {
             })
             .await
         }
+        Command::RulesCheck { rules_dir } => run_rules_check(&rules_dir),
     }
+}
+
+/// Lints every rule file in `rules_dir`, reporting each parse failure
+/// individually rather than stopping at the first one — useful when
+/// you've got several new/edited rules and want the full picture in
+/// one pass.
+fn run_rules_check(rules_dir: &str) -> Result<()> {
+    let (ruleset, errors) = offgrd_rules::RuleSet::load_dir_report(rules_dir)?;
+
+    println!(
+        "offgrd: {} rule(s) loaded successfully from '{rules_dir}'",
+        ruleset.len()
+    );
+
+    if errors.is_empty() {
+        println!("offgrd: no problems found.");
+        return Ok(());
+    }
+
+    println!("offgrd: {} file(s) failed to load:", errors.len());
+    for error in &errors {
+        println!("  - {error}");
+    }
+
+    anyhow::bail!("{} rule file(s) had errors", errors.len());
 }
 
 fn run_alert_history(json: bool, limit: i64, db_path: &str) -> Result<()> {
@@ -272,7 +301,7 @@ async fn run_alerts(
 
 #[cfg(windows)]
 async fn run_watch(json: bool, seconds: u64, save: bool, db_path: &str) -> Result<()> {
-    use etw_collector::EtwProcessCollector;
+    use offgrd_collectors::EtwProcessCollector;
 
     let bus = EventBus::new();
     let mut subscription = bus.subscribe();
