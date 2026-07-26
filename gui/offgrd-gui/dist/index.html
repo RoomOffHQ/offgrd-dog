@@ -27,6 +27,18 @@
         <button class="nav-item" data-view="alerts">
           <span class="nav-icon">▲</span> Alerts
         </button>
+        <button class="nav-item" data-view="network">
+          <span class="nav-icon">◈</span> Network
+        </button>
+        <button class="nav-item" data-view="autoruns">
+          <span class="nav-icon">⚙</span> Autoruns
+        </button>
+        <button class="nav-item" data-view="services">
+          <span class="nav-icon">▣</span> Services
+        </button>
+        <button class="nav-item" data-view="certificates">
+          <span class="nav-icon">✓</span> Certificates
+        </button>
         <button class="nav-item" data-view="rules">
           <span class="nav-icon">≡</span> Rules
         </button>
@@ -65,6 +77,11 @@
           </div>
         </div>
 
+        <div class="panel">
+          <div class="panel-title">Data locations</div>
+          <p class="muted" id="data-paths">—</p>
+        </div>
+
         <div class="panel" id="rule-errors-panel" style="display:none">
           <div class="panel-title">⚠ Rule load errors</div>
           <ul id="rule-errors-list" class="error-list"></ul>
@@ -87,11 +104,14 @@
           <h1>Processes</h1>
           <div class="header-actions">
             <input type="search" id="process-search" placeholder="Filter by image path or PID…" />
+            <button class="btn" id="toggle-process-view">Tree view</button>
+            <button class="btn" id="export-processes-json">Export JSON</button>
+            <button class="btn" id="export-processes-csv">Export CSV</button>
             <button class="btn btn-primary" id="refresh-processes">Refresh</button>
           </div>
         </header>
 
-        <div class="table-wrap">
+        <div class="table-wrap" id="process-table-wrap">
           <table>
             <thead>
               <tr>
@@ -106,6 +126,10 @@
             </tbody>
           </table>
         </div>
+
+        <div class="panel" id="process-tree-wrap" style="display:none">
+          <pre id="process-tree" class="mono tree-view"></pre>
+        </div>
       </section>
 
       <!-- ALERTS -->
@@ -114,6 +138,8 @@
           <h1>Alerts</h1>
           <div class="header-actions">
             <button class="btn" id="load-alert-history">Load history</button>
+            <button class="btn" id="export-alerts-json">Export JSON</button>
+            <button class="btn" id="export-alerts-csv">Export CSV</button>
             <button class="btn btn-primary" id="scan-now">Scan now</button>
           </div>
         </header>
@@ -135,21 +161,104 @@
         </div>
       </section>
 
+      <!-- NETWORK -->
+      <section class="view" id="view-network">
+        <header class="view-header">
+          <h1>Network</h1>
+          <div class="header-actions">
+            <input type="search" id="network-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-network">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Local</th><th>Remote</th><th>State</th><th>PID</th></tr>
+            </thead>
+            <tbody id="network-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load connections.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- AUTORUNS -->
+      <section class="view" id="view-autoruns">
+        <header class="view-header">
+          <h1>Autoruns</h1>
+          <div class="header-actions">
+            <input type="search" id="autoruns-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-autoruns">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Hive</th><th>Key</th><th>Name</th><th>Data</th></tr>
+            </thead>
+            <tbody id="autoruns-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load autorun entries.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SERVICES -->
+      <section class="view" id="view-services">
+        <header class="view-header">
+          <h1>Services</h1>
+          <div class="header-actions">
+            <input type="search" id="services-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-services">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Service Name</th><th>State</th><th>Type</th><th>Display Name</th></tr>
+            </thead>
+            <tbody id="services-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load services.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CERTIFICATES -->
+      <section class="view" id="view-certificates">
+        <header class="view-header">
+          <h1>Certificates</h1>
+          <div class="header-actions">
+            <input type="search" id="certificates-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-certificates">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Store</th><th>Subject</th><th>Issuer</th><th>Expires</th></tr>
+            </thead>
+            <tbody id="certificates-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load certificates.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- RULES -->
       <section class="view" id="view-rules">
         <header class="view-header">
           <h1>Rules</h1>
+          <button class="btn btn-primary" id="refresh-rules">Refresh</button>
         </header>
-        <div class="panel">
-          <p class="muted">
-            Detection rules live as YAML files in the <code>rules/</code>
-            directory and are evaluated by the same
-            <code>offgrd-rules</code> engine the CLI uses (<code>offgrd
-            alerts</code> / <code>offgrd rules-check</code>). A dedicated
-            rule editor is planned — for now, edit the YAML files directly
-            and use "Scan now" on the Alerts page to test changes.
-          </p>
-        </div>
+        <p class="muted" style="margin-bottom:16px;">
+          Detection rules live as YAML files in the <code>rules/</code>
+          directory and are evaluated by the same
+          <code>offgrd-rules</code> engine the CLI uses. Edit the YAML
+          directly (see <code>CONTRIBUTING.md</code>) and hit Refresh, or
+          use "Scan now" on the Alerts page to test changes.
+        </p>
+        <div id="rules-list"></div>
       </section>
     </main>
   </div>

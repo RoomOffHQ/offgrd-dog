@@ -1,29 +1,23 @@
 //! Polling-based "daemon-lite" monitor.
 //!
-//! `EtwProcessCollector` (see `etw_collector.rs`) is still experimental
-//! and unverified, so real continuous monitoring shouldn't wait on it.
-//! This module gets there a different, much lower-risk way: repeatedly
-//! run the already-solid `ProcessSnapshotCollector` on a fixed
-//! interval, diff each snapshot against the previous one by pid set,
-//! and only treat *newly appeared* / *newly gone* pids as
-//! start/stop events — so a 5-second poll loop doesn't re-report every
-//! already-running process on every tick.
+//! `EtwProcessCollector` (see `offgrd-collectors::etw_collector`) is
+//! still experimental and unverified, so real continuous monitoring
+//! shouldn't wait on it. This module gets there a different, much
+//! lower-risk way: repeatedly diff process snapshots on a fixed
+//! interval via `offgrd_collectors::PollDiffer` (shared with the GUI's
+//! live view — see `gui/offgrd-gui/src-tauri/src/live.rs` — so there's
+//! exactly one implementation of the diffing logic itself).
 //!
 //! This is intentionally not "the ETW collector but slower" — it's a
 //! different tradeoff (coarser timing resolution, no command line,
-//! polling overhead) that happens to be usable *today*. Once ETW is
-//! verified working, `offgrd monitor` and the future ETW-based daemon
-//! mode can coexist: polling as a robust fallback / non-admin path,
-//! ETW as the higher-fidelity default.
+//! polling overhead) that happens to be usable *today*.
 
-use offgrd_collectors::ProcessSnapshotCollector;
 use anyhow::Result;
-use offgrd_common::{Event, EventCategory, EventPayload, EventSource};
-use offgrd_core::{Collector, EventBus, EventStore};
+use offgrd_collectors::{PollDiffer, PollTick};
+use offgrd_common::{Event, EventPayload};
+use offgrd_core::EventStore;
 use offgrd_rules::RuleSet;
-use std::collections::{HashMap, HashSet};
 use std::time::Duration;
-use tokio::sync::broadcast::error::TryRecvError;
 
 pub struct MonitorConfig {
     pub interval: Duration,
@@ -52,8 +46,7 @@ pub async fn run(config: MonitorConfig) -> Result<()> {
         None
     };
 
-    let mut previous_pids: HashSet<u32> = HashSet::new();
-    let mut first_tick = true;
+    let mut differ = PollDiffer::new();
 
     loop {
         tokio::select! {
@@ -64,50 +57,14 @@ pub async fn run(config: MonitorConfig) -> Result<()> {
             }
         }
 
-        let snapshot = take_snapshot().await?;
-        let current_pids: HashSet<u32> = snapshot.keys().copied().collect();
-
-        if first_tick {
-            // On the very first tick, everything currently running is
-            // "pre-existing", not "newly started" — reporting a
-            // start event for every process already on the system the
-            // moment you launch offgrd would be noisy and misleading.
-            // We still record the baseline so the *next* tick's diff
-            // is meaningful.
-            previous_pids = current_pids;
-            first_tick = false;
-            eprintln!(
-                "offgrd: baseline captured ({} process(es) currently running).",
-                previous_pids.len()
-            );
-            continue;
-        }
-
-        let started: Vec<u32> = current_pids.difference(&previous_pids).copied().collect();
-        let stopped: Vec<u32> = previous_pids.difference(&current_pids).copied().collect();
-
-        let mut new_events = Vec::new();
-        for pid in &started {
-            if let Some(process) = snapshot.get(pid) {
-                new_events.push(Event::new(
-                    EventSource::Snapshot,
-                    EventCategory::Process,
-                    EventPayload::ProcessStarted {
-                        process: process.clone(),
-                    },
-                ));
+        let tick = differ.tick().await?;
+        let new_events = match tick {
+            PollTick::Baseline { process_count } => {
+                eprintln!("offgrd: baseline captured ({process_count} process(es) currently running).");
+                continue;
             }
-        }
-        for pid in &stopped {
-            new_events.push(Event::new(
-                EventSource::Snapshot,
-                EventCategory::Process,
-                EventPayload::ProcessEnded {
-                    pid: *pid,
-                    exit_code: None, // Polling can't observe exit codes, only absence.
-                },
-            ));
-        }
+            PollTick::Diff(events) => events,
+        };
 
         for event in &new_events {
             print_event(event, config.json);
@@ -127,34 +84,9 @@ pub async fn run(config: MonitorConfig) -> Result<()> {
                 }
             }
         }
-
-        previous_pids = current_pids;
     }
 
     Ok(())
-}
-
-/// Runs one `ProcessSnapshotCollector` pass through a fresh bus and
-/// returns the result keyed by pid for easy diffing.
-async fn take_snapshot() -> Result<HashMap<u32, offgrd_common::ProcessRef>> {
-    let bus = EventBus::new();
-    let mut subscription = bus.subscribe();
-    let collector = ProcessSnapshotCollector;
-    collector.run(&bus).await?;
-
-    let mut snapshot = HashMap::new();
-    loop {
-        match subscription.try_recv() {
-            Ok(event) => {
-                if let EventPayload::ProcessStarted { process } = event.payload {
-                    snapshot.insert(process.pid, process);
-                }
-            }
-            Err(TryRecvError::Empty) | Err(TryRecvError::Closed) => break,
-            Err(TryRecvError::Lagged(_)) => continue,
-        }
-    }
-    Ok(snapshot)
 }
 
 fn print_event(event: &Event, json: bool) {

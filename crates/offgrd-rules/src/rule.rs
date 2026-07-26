@@ -44,6 +44,12 @@ pub struct Condition {
     /// Toolhelp32 snapshot collector doesn't populate this field).
     #[serde(default)]
     pub command_line_contains: Option<String>,
+
+    /// Case-insensitive substring match against an autorun entry's
+    /// value data, if the event carries one (`AutorunEntryObserved`
+    /// events only).
+    #[serde(default)]
+    pub value_data_contains: Option<String>,
 }
 
 impl Rule {
@@ -61,14 +67,27 @@ impl Condition {
             }
         }
 
-        if self.image_path_contains.is_none() && self.command_line_contains.is_none() {
-            return true; // Category-only rule (or empty condition): nothing more to check.
+        if self.image_path_contains.is_some() || self.command_line_contains.is_some() {
+            if !self.matches_process_fields(event) {
+                return false;
+            }
         }
 
+        if let Some(needle) = &self.value_data_contains {
+            if !self.matches_value_data(event, needle) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Checks `image_path_contains`/`command_line_contains` against a
+    /// `ProcessStarted` event. Returns `false` for any other event
+    /// shape — a rule asking about process fields can only ever match
+    /// process-start events, not e.g. autorun entries.
+    fn matches_process_fields(&self, event: &Event) -> bool {
         let EventPayload::ProcessStarted { process } = &event.payload else {
-            // A rule asking about image_path/command_line can only
-            // ever match ProcessStarted events; anything else is a
-            // non-match rather than an error.
             return false;
         };
 
@@ -95,6 +114,16 @@ impl Condition {
         }
 
         true
+    }
+
+    /// Checks `value_data_contains` against an `AutorunEntryObserved`
+    /// event. Returns `false` for any other event shape, same
+    /// reasoning as `matches_process_fields`.
+    fn matches_value_data(&self, event: &Event, needle: &str) -> bool {
+        let EventPayload::AutorunEntryObserved { value_data, .. } = &event.payload else {
+            return false;
+        };
+        value_data.to_lowercase().contains(&needle.to_lowercase())
     }
 }
 
@@ -127,6 +156,7 @@ mod tests {
                 category: Some(EventCategory::Process),
                 image_path_contains: Some("powershell.exe".into()),
                 command_line_contains: None,
+                value_data_contains: None,
             },
         }
     }
@@ -158,6 +188,7 @@ mod tests {
                 category: None,
                 image_path_contains: None,
                 command_line_contains: Some("-EncodedCommand".into()),
+                value_data_contains: None,
             },
         };
 
@@ -187,9 +218,56 @@ mod tests {
                 category: Some(EventCategory::Process),
                 image_path_contains: None,
                 command_line_contains: None,
+                value_data_contains: None,
             },
         };
 
         assert!(rule.matches(&process_event(r"C:\anything.exe", None)));
+    }
+
+    #[test]
+    fn value_data_contains_matches_autorun_entries_only() {
+        let rule = Rule {
+            id: "test-autorun-appdata".into(),
+            title: "Autorun in AppData".into(),
+            description: String::new(),
+            severity: Severity::Medium,
+            mitre_attack_id: None,
+            references: vec![],
+            condition: Condition {
+                category: Some(EventCategory::Persistence),
+                image_path_contains: None,
+                command_line_contains: None,
+                value_data_contains: Some(r"\AppData\".into()),
+            },
+        };
+
+        let matching = Event::new(
+            EventSource::Snapshot,
+            EventCategory::Persistence,
+            EventPayload::AutorunEntryObserved {
+                hive: "HKCU".into(),
+                key_path: r"Software\Microsoft\Windows\CurrentVersion\Run".into(),
+                value_name: "Updater".into(),
+                value_data: r"C:\Users\alice\AppData\Roaming\updater.exe".into(),
+            },
+        );
+        let non_matching = Event::new(
+            EventSource::Snapshot,
+            EventCategory::Persistence,
+            EventPayload::AutorunEntryObserved {
+                hive: "HKLM".into(),
+                key_path: r"Software\Microsoft\Windows\CurrentVersion\Run".into(),
+                value_name: "Driver Booster".into(),
+                value_data: r"C:\Program Files\IObit\DriverBooster\Booster.exe".into(),
+            },
+        );
+        // A ProcessStarted event should never match a value_data_contains
+        // rule, regardless of content — different payload shape entirely.
+        let wrong_shape = process_event(r"C:\Users\alice\AppData\evil.exe", None);
+
+        assert!(rule.matches(&matching));
+        assert!(!rule.matches(&non_matching));
+        assert!(!rule.matches(&wrong_shape));
     }
 }

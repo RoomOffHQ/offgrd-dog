@@ -1,0 +1,55 @@
+name: Release
+
+# Triggered by pushing a version tag (e.g. `v0.2.0`). Builds a release
+# binary, generates a checksum file and a CycloneDX SBOM, and publishes
+# them as a draft GitHub Release for a maintainer to review and
+# publish. Deliberately NOT code-signed yet — see
+# docs/offgrd-dog-architecture.md's Security section for the intended
+# EV-cert + Windows Hardware Dev Center attestation signing setup,
+# which needs real secrets/certs this repo doesn't have configured.
+# Track that as a follow-up before the first non-draft release.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build (release)
+        run: cargo build --workspace --release
+
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          Get-FileHash target/release/offgrd.exe -Algorithm SHA256 |
+            Select-Object -ExpandProperty Hash |
+            Out-File -Encoding ascii offgrd.exe.sha256
+
+      - name: Install cargo-cyclonedx (SBOM)
+        run: cargo install cargo-cyclonedx --locked
+
+      - name: Generate SBOM (CycloneDX)
+        run: cargo cyclonedx --format json
+
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            target/release/offgrd.exe
+            offgrd.exe.sha256
+            **/*.cdx.json

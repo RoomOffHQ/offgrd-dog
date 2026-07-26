@@ -9,13 +9,23 @@
 //! `unsafe` block in this crate has a `// SAFETY:` comment; see
 //! `platform/windows.rs` and `etw_collector.rs`.
 
+pub mod autoruns;
+pub mod certificates;
+pub mod network_snapshot;
 pub mod platform;
+pub mod poll_diff;
 pub mod process_snapshot;
+pub mod services;
 
 #[cfg(windows)]
 pub mod etw_collector;
 
+pub use autoruns::AutorunsCollector;
+pub use certificates::CertificatesCollector;
+pub use network_snapshot::NetworkSnapshotCollector;
+pub use poll_diff::{PollDiffer, PollTick};
 pub use process_snapshot::ProcessSnapshotCollector;
+pub use services::ServicesCollector;
 
 #[cfg(windows)]
 pub use etw_collector::EtwProcessCollector;

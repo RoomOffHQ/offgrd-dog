@@ -1,0 +1,19 @@
+id: autorun-from-temp-or-appdata
+title: Autorun entry points to a Temp or AppData location
+description: >
+  Legitimate installed software almost always registers autoruns
+  pointing at Program Files; malware very commonly persists via a Run
+  key pointing at %TEMP%, %APPDATA%, or a user's Downloads folder
+  instead, since it can write there without admin rights. This rule
+  is a coarse heuristic (substring match on the value data) and WILL
+  have false positives for legitimate portable/user-scoped software —
+  treat a match as "worth a look," not "confirmed malicious." Also
+  note: this only catches the "\AppData\" substring specifically; a
+  companion rule for "\Temp\" would need a separate rule file, since
+  a single Condition is one AND-of-fields check, not an OR list yet.
+severity: Medium
+references:
+  - https://attack.mitre.org/techniques/T1547/001/
+condition:
+  category: Persistence
+  value_data_contains: "\\AppData\\"

@@ -8,10 +8,12 @@
 //! (network, registry, filesystem, ETW-based process monitoring) will
 //! plug into the same pipeline.
 
+mod export;
 mod monitor;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use export::{ExportFormat, ExportKind};
 use offgrd_collectors::ProcessSnapshotCollector;
 use offgrd_common::{Event, EventPayload};
 use offgrd_core::{Collector, EventBus, EventStore};
@@ -124,6 +126,48 @@ enum Command {
         #[arg(long, default_value = "rules")]
         rules_dir: String,
     },
+    /// List active IPv4 TCP connections (Windows only).
+    Net {
+        /// Persist observed connections to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
+    /// List registry Run/RunOnce autorun entries (Windows only).
+    Autoruns {
+        /// Persist observed entries to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
+    /// List Windows services (Windows only).
+    Services {
+        /// Persist observed services to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
+    /// List certificates in the ROOT/CA/MY system stores (Windows only).
+    Certs {
+        /// Persist observed certificates to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
+    /// Export stored events or alerts to a file (JSON, CSV, HTML, or Markdown).
+    Export {
+        /// What to export.
+        #[arg(long, value_enum)]
+        kind: ExportKind,
+
+        /// Output format.
+        #[arg(long, value_enum)]
+        format: ExportFormat,
+
+        /// Output file path.
+        #[arg(long)]
+        output: String,
+
+        /// How many recent records to export, most recent first.
+        #[arg(long, default_value_t = 1000)]
+        limit: i64,
+    },
 }
 
 #[tokio::main]
@@ -158,7 +202,237 @@ async fn main() -> Result<()> {
             .await
         }
         Command::RulesCheck { rules_dir } => run_rules_check(&rules_dir),
+        Command::Net { save } => run_net(cli.json, save, &cli.db).await,
+        Command::Autoruns { save } => run_autoruns(cli.json, save, &cli.db).await,
+        Command::Services { save } => run_services(cli.json, save, &cli.db).await,
+        Command::Certs { save } => run_certs(cli.json, save, &cli.db).await,
+        Command::Export {
+            kind,
+            format,
+            output,
+            limit,
+        } => export::run(kind, format, &output, limit, &cli.db),
     }
+}
+
+/// Lists certificates in the system stores via `CertificatesCollector`.
+/// Same bus-based pattern as the other snapshot subcommands.
+async fn run_certs(json: bool, save: bool, db_path: &str) -> Result<()> {
+    let bus = EventBus::new();
+    let mut subscription = bus.subscribe();
+    let collector = offgrd_collectors::CertificatesCollector;
+    collector.run(&bus).await?;
+
+    let mut events: Vec<Event> = Vec::new();
+    loop {
+        match subscription.try_recv() {
+            Ok(event) => events.push(event),
+            Err(TryRecvError::Empty) | Err(TryRecvError::Closed) => break,
+            Err(TryRecvError::Lagged(_)) => continue,
+        }
+    }
+
+    if save {
+        let store = EventStore::open(db_path)?;
+        for event in &events {
+            store.insert(event)?;
+        }
+        eprintln!("saved {} certificate(s) to {db_path}", events.len());
+    }
+
+    if json {
+        for event in &events {
+            println!("{}", serde_json::to_string(event)?);
+        }
+        return Ok(());
+    }
+
+    println!("{:<6}  {:<45}  {:<45}  EXPIRES", "STORE", "SUBJECT", "ISSUER");
+    for event in &events {
+        if let EventPayload::CertificateObserved {
+            store_name,
+            subject,
+            issuer,
+            not_after,
+            ..
+        } = &event.payload
+        {
+            println!(
+                "{:<6}  {:<45}  {:<45}  {}",
+                store_name,
+                truncate(subject, 45),
+                truncate(issuer, 45),
+                not_after.format("%Y-%m-%d"),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        let truncated: String = s.chars().take(max.saturating_sub(1)).collect();
+        format!("{truncated}…")
+    }
+}
+
+/// Lists Windows services via `ServicesCollector`. Same bus-based
+/// pattern as `run_ps`/`run_net`/`run_autoruns`.
+async fn run_services(json: bool, save: bool, db_path: &str) -> Result<()> {
+    let bus = EventBus::new();
+    let mut subscription = bus.subscribe();
+    let collector = offgrd_collectors::ServicesCollector;
+    collector.run(&bus).await?;
+
+    let mut events: Vec<Event> = Vec::new();
+    loop {
+        match subscription.try_recv() {
+            Ok(event) => events.push(event),
+            Err(TryRecvError::Empty) | Err(TryRecvError::Closed) => break,
+            Err(TryRecvError::Lagged(_)) => continue,
+        }
+    }
+
+    if save {
+        let store = EventStore::open(db_path)?;
+        for event in &events {
+            store.insert(event)?;
+        }
+        eprintln!("saved {} service(s) to {db_path}", events.len());
+    }
+
+    if json {
+        for event in &events {
+            println!("{}", serde_json::to_string(event)?);
+        }
+        return Ok(());
+    }
+
+    println!("{:<40}  {:<12}  {:<16}  DISPLAY NAME", "SERVICE NAME", "STATE", "TYPE");
+    for event in &events {
+        if let EventPayload::ServiceObserved {
+            service_name,
+            display_name,
+            state,
+            service_type,
+            ..
+        } = &event.payload
+        {
+            println!("{service_name:<40}  {state:<12}  {service_type:<16}  {display_name}");
+        }
+    }
+
+    Ok(())
+}
+
+/// Lists registry Run/RunOnce autorun entries via `AutorunsCollector`.
+/// Same bus-based pattern as `run_ps`/`run_net`.
+async fn run_autoruns(json: bool, save: bool, db_path: &str) -> Result<()> {
+    let bus = EventBus::new();
+    let mut subscription = bus.subscribe();
+    let collector = offgrd_collectors::AutorunsCollector;
+    collector.run(&bus).await?;
+
+    let mut events: Vec<Event> = Vec::new();
+    loop {
+        match subscription.try_recv() {
+            Ok(event) => events.push(event),
+            Err(TryRecvError::Empty) | Err(TryRecvError::Closed) => break,
+            Err(TryRecvError::Lagged(_)) => continue,
+        }
+    }
+
+    if save {
+        let store = EventStore::open(db_path)?;
+        for event in &events {
+            store.insert(event)?;
+        }
+        eprintln!("saved {} autorun entry(ies) to {db_path}", events.len());
+    }
+
+    if json {
+        for event in &events {
+            println!("{}", serde_json::to_string(event)?);
+        }
+        return Ok(());
+    }
+
+    println!("{:<6}  {:<55}  {:<20}  DATA", "HIVE", "KEY", "NAME");
+    for event in &events {
+        if let EventPayload::AutorunEntryObserved {
+            hive,
+            key_path,
+            value_name,
+            value_data,
+        } = &event.payload
+        {
+            println!("{hive:<6}  {key_path:<55}  {value_name:<20}  {value_data}");
+        }
+    }
+
+    Ok(())
+}
+
+/// Lists active IPv4 TCP connections via `NetworkSnapshotCollector`.
+/// Same bus-based pattern as `run_ps`.
+async fn run_net(json: bool, save: bool, db_path: &str) -> Result<()> {
+    let bus = EventBus::new();
+    let mut subscription = bus.subscribe();
+    let collector = offgrd_collectors::NetworkSnapshotCollector;
+    collector.run(&bus).await?;
+
+    let mut events: Vec<Event> = Vec::new();
+    loop {
+        match subscription.try_recv() {
+            Ok(event) => events.push(event),
+            Err(TryRecvError::Empty) | Err(TryRecvError::Closed) => break,
+            Err(TryRecvError::Lagged(_)) => continue,
+        }
+    }
+
+    if save {
+        let store = EventStore::open(db_path)?;
+        for event in &events {
+            store.insert(event)?;
+        }
+        eprintln!("saved {} connection(s) to {db_path}", events.len());
+    }
+
+    if json {
+        for event in &events {
+            println!("{}", serde_json::to_string(event)?);
+        }
+        return Ok(());
+    }
+
+    println!(
+        "{:<21}  {:<21}  {:<12}  PID",
+        "LOCAL", "REMOTE", "STATE"
+    );
+    for event in &events {
+        if let EventPayload::NetworkConnectionObserved {
+            pid,
+            local_addr,
+            local_port,
+            remote_addr,
+            remote_port,
+            state,
+        } = &event.payload
+        {
+            println!(
+                "{:<21}  {:<21}  {:<12}  {}",
+                format!("{local_addr}:{local_port}"),
+                format!("{remote_addr}:{remote_port}"),
+                state,
+                pid.map(|p| p.to_string()).unwrap_or_else(|| "-".into()),
+            );
+        }
+    }
+
+    Ok(())
 }
 
 /// Lints every rule file in `rules_dir`, reporting each parse failure

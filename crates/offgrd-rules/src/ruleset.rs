@@ -21,6 +21,13 @@ impl RuleSet {
         self.rules.len()
     }
 
+    /// Read-only access to the loaded rules themselves — used by the
+    /// GUI's Rules view to show what's actually loaded (id, title,
+    /// severity, description) rather than just a count.
+    pub fn rules(&self) -> &[Rule] {
+        &self.rules
+    }
+
     /// Loads every `*.yaml`/`*.yml` file in `dir` (non-recursive for
     /// now) as a single `Rule` each. A directory that doesn't exist or
     /// contains no rule files yields an empty, valid `RuleSet` rather

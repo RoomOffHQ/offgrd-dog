@@ -1,0 +1,53 @@
+# cargo-deny configuration.
+# Run locally with: cargo install cargo-deny && cargo deny check
+# Wired into CI as part of the security-checks job (see
+# .github/workflows/ci.yml — not yet added there; see WIP.md/ROADMAP.md).
+
+[graph]
+targets = [
+    { triple = "x86_64-pc-windows-msvc" },
+    { triple = "aarch64-pc-windows-msvc" },
+]
+
+[licenses]
+version = 2
+# GPLv3 project: only allow licenses compatible with (or permissive
+# enough to be used under) GPLv3 for dependencies. Adjust as real
+# dependencies are audited — this is a starting allowlist covering
+# what the current dependency tree is expected to use, not an
+# exhaustive policy.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "CC0-1.0",
+    "MPL-2.0",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+deny = [
+    # Add explicitly-banned crates here as they come up (e.g. a
+    # yanked or known-vulnerable transitive dependency that needs a
+    # documented reason for exclusion).
+]
+
+[advisories]
+version = 2
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "deny"
+# unmaintained/unsound/notice default to "warn" in cargo-deny 2.x;
+# left as default rather than overridden here so this file doesn't
+# silently drift out of sync with cargo-deny's own defaults.
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
