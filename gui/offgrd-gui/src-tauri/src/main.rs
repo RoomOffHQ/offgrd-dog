@@ -243,6 +243,148 @@ fn set_monitoring_mode(mode: MonitoringMode, state: tauri::State<'_, MonitoringS
 }
 
 #[derive(Serialize, Clone)]
+struct ModuleDto {
+    pid: u32,
+    module_name: String,
+    module_path: String,
+    base_size: u32,
+}
+
+#[derive(Serialize, Clone)]
+struct SessionDto {
+    session_id: u32,
+    state: String,
+    station_name: String,
+    user_name: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+struct HostsEntryDto {
+    ip_address: String,
+    hostname: String,
+    raw_line: String,
+}
+
+#[derive(Serialize, Clone)]
+struct StartupItemDto {
+    scope: String,
+    file_name: String,
+    full_path: String,
+}
+
+#[derive(Serialize, Clone)]
+struct NamedPipeDto {
+    pipe_name: String,
+}
+
+#[derive(Serialize, Clone)]
+struct InstalledProgramDto {
+    display_name: String,
+    display_version: Option<String>,
+    publisher: Option<String>,
+    install_location: Option<String>,
+}
+
+#[tauri::command]
+async fn list_modules() -> Result<Vec<ModuleDto>, String> {
+    collect_and_extract(offgrd_collectors::ModulesCollector, |event| match &event.payload {
+        EventPayload::LoadedModuleObserved { pid, module_name, module_path, base_size } => {
+            Some(ModuleDto {
+                pid: *pid,
+                module_name: module_name.clone(),
+                module_path: module_path.clone(),
+                base_size: *base_size,
+            })
+        }
+        _ => None,
+    })
+    .await
+}
+
+#[tauri::command]
+async fn list_sessions() -> Result<Vec<SessionDto>, String> {
+    collect_and_extract(offgrd_collectors::SessionsCollector, |event| match &event.payload {
+        EventPayload::SessionObserved { session_id, state, station_name, user_name } => {
+            Some(SessionDto {
+                session_id: *session_id,
+                state: state.clone(),
+                station_name: station_name.clone(),
+                user_name: user_name.clone(),
+            })
+        }
+        _ => None,
+    })
+    .await
+}
+
+#[tauri::command]
+async fn list_hosts_entries() -> Result<Vec<HostsEntryDto>, String> {
+    collect_and_extract(offgrd_collectors::HostsFileCollector, |event| match &event.payload {
+        EventPayload::HostsFileEntryObserved { ip_address, hostname, raw_line } => {
+            Some(HostsEntryDto {
+                ip_address: ip_address.clone(),
+                hostname: hostname.clone(),
+                raw_line: raw_line.clone(),
+            })
+        }
+        _ => None,
+    })
+    .await
+}
+
+#[tauri::command]
+async fn list_startup_items() -> Result<Vec<StartupItemDto>, String> {
+    collect_and_extract(offgrd_collectors::StartupFolderCollector, |event| match &event.payload {
+        EventPayload::StartupFolderEntryObserved { scope, file_name, full_path } => {
+            Some(StartupItemDto {
+                scope: scope.clone(),
+                file_name: file_name.clone(),
+                full_path: full_path.clone(),
+            })
+        }
+        _ => None,
+    })
+    .await
+}
+
+#[tauri::command]
+async fn list_named_pipes() -> Result<Vec<NamedPipeDto>, String> {
+    collect_and_extract(offgrd_collectors::NamedPipesCollector, |event| match &event.payload {
+        EventPayload::NamedPipeObserved { pipe_name } => {
+            Some(NamedPipeDto { pipe_name: pipe_name.clone() })
+        }
+        _ => None,
+    })
+    .await
+}
+
+#[tauri::command]
+async fn list_installed_programs() -> Result<Vec<InstalledProgramDto>, String> {
+    collect_and_extract(offgrd_collectors::InstalledProgramsCollector, |event| match &event.payload {
+        EventPayload::InstalledProgramObserved { display_name, display_version, publisher, install_location } => {
+            Some(InstalledProgramDto {
+                display_name: display_name.clone(),
+                display_version: display_version.clone(),
+                publisher: publisher.clone(),
+                install_location: install_location.clone(),
+            })
+        }
+        _ => None,
+    })
+    .await
+}
+
+/// Deliberately a separate, explicit, single-shot command rather than
+/// something the Dashboard/live monitor ever calls automatically —
+/// see `ClipboardCollector`'s doc comment on why this is
+/// privacy-sensitive. The frontend gates this behind an explicit
+/// "Reveal clipboard" button, never an auto-refresh.
+#[tauri::command]
+async fn get_clipboard_snapshot() -> Result<Option<String>, String> {
+    offgrd_collectors::clipboard::read_clipboard_text().map_err(|e| e.to_string())
+}
+
+#[derive(Serialize, Clone)]
 struct NetworkConnectionDto {
     pid: Option<u32>,
     local_addr: String,
@@ -518,6 +660,13 @@ fn main() {
             list_autoruns,
             list_services,
             list_certificates,
+            list_modules,
+            list_sessions,
+            list_hosts_entries,
+            list_startup_items,
+            list_named_pipes,
+            list_installed_programs,
+            get_clipboard_snapshot,
             get_monitoring_mode,
             set_monitoring_mode,
         ])

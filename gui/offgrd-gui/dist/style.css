@@ -81,6 +81,17 @@ html, body {
   flex-direction: column;
   gap: 2px;
   flex: 1;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.nav-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  padding: 12px 12px 4px 12px;
+  opacity: 0.7;
 }
 
 .nav-item {
@@ -574,4 +585,18 @@ tbody tr:hover { background: var(--bg-hover); }
 @keyframes badge-pulse {
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.35); }
+}
+
+.clipboard-box {
+  margin-top: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
 }

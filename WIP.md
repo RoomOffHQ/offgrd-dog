@@ -175,6 +175,21 @@ expect problems, in rough order of how much I'd bet on each.
   **GUI wiring for these 7 not done yet** — CLI-only this round, GUI
   parity (like the round that added Network/Autoruns/Services/
   Certificates to the GUI) is a natural next step.
+- [x] **GUI wiring for the 7 new collectors (NEW this round)** — 7
+  new Tauri commands (`list_modules`, `list_sessions`,
+  `list_hosts_entries`, `list_startup_items`, `list_named_pipes`,
+  `list_installed_programs`, `get_clipboard_snapshot`), all but the
+  last built on the same `collect_and_extract` helper from the
+  previous GUI-parity round. **Clipboard is deliberately NOT wired
+  into the generic `simpleViews`/auto-refresh pattern** — it's a
+  separate command, gated behind an explicit "Reveal clipboard text"
+  button the user has to click, with a visible privacy warning above
+  it, and is never called by the live monitor or any auto-refresh
+  path. The other 6 got a new nav item each. Sidebar reorganized into
+  labeled sections (Processes / Network & Identity / Persistence /
+  System / Configuration) now that it's 15 items — plus
+  `overflow-y: auto` on the nav so it scrolls instead of overflowing
+  the window on smaller screens.
 - [x] **Monitoring modes + UX overhaul (NEW this round, user-requested)**:
   - **Three monitoring postures** — Normal (nothing runs in the
     background, fully on-demand — the original behavior), Moderate

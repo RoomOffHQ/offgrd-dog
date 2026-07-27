@@ -21,24 +21,55 @@
         <button class="nav-item active" data-view="dashboard">
           <span class="nav-icon">◧</span> Dashboard
         </button>
-        <button class="nav-item" data-view="processes">
-          <span class="nav-icon">▤</span> Processes
-        </button>
         <button class="nav-item" data-view="alerts">
           <span class="nav-icon">▲</span> Alerts
         </button>
+
+        <div class="nav-section-label">Processes</div>
+        <button class="nav-item" data-view="processes">
+          <span class="nav-icon">▤</span> Processes
+        </button>
+        <button class="nav-item" data-view="modules">
+          <span class="nav-icon">▥</span> Modules
+        </button>
+
+        <div class="nav-section-label">Network &amp; Identity</div>
         <button class="nav-item" data-view="network">
           <span class="nav-icon">◈</span> Network
         </button>
+        <button class="nav-item" data-view="sessions">
+          <span class="nav-icon">▦</span> Sessions
+        </button>
+        <button class="nav-item" data-view="hosts">
+          <span class="nav-icon">◎</span> Hosts File
+        </button>
+
+        <div class="nav-section-label">Persistence</div>
         <button class="nav-item" data-view="autoruns">
           <span class="nav-icon">⚙</span> Autoruns
+        </button>
+        <button class="nav-item" data-view="startup-items">
+          <span class="nav-icon">▶</span> Startup Items
         </button>
         <button class="nav-item" data-view="services">
           <span class="nav-icon">▣</span> Services
         </button>
+        <button class="nav-item" data-view="programs">
+          <span class="nav-icon">▧</span> Programs
+        </button>
+
+        <div class="nav-section-label">System</div>
         <button class="nav-item" data-view="certificates">
           <span class="nav-icon">✓</span> Certificates
         </button>
+        <button class="nav-item" data-view="pipes">
+          <span class="nav-icon">▬</span> Pipes
+        </button>
+        <button class="nav-item" data-view="clipboard">
+          <span class="nav-icon">⧉</span> Clipboard
+        </button>
+
+        <div class="nav-section-label">Configuration</div>
         <button class="nav-item" data-view="rules">
           <span class="nav-icon">≡</span> Rules
         </button>
@@ -267,6 +298,137 @@
               <tr><td colspan="4" class="empty-row">Click Refresh to load certificates.</td></tr>
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- MODULES -->
+      <section class="view" id="view-modules">
+        <header class="view-header">
+          <h1>Modules</h1>
+          <div class="header-actions">
+            <input type="search" id="modules-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-modules">Refresh</button>
+          </div>
+        </header>
+        <p class="muted" style="margin-bottom:12px;">Loaded DLLs across every running process — scans all processes, so this may take a few seconds.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>PID</th><th>Module</th><th>Path</th><th>Size</th></tr></thead>
+            <tbody id="modules-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load modules.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SESSIONS -->
+      <section class="view" id="view-sessions">
+        <header class="view-header">
+          <h1>Sessions</h1>
+          <div class="header-actions">
+            <input type="search" id="sessions-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-sessions">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Station</th><th>State</th><th>User</th></tr></thead>
+            <tbody id="sessions-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load sessions.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- HOSTS FILE -->
+      <section class="view" id="view-hosts">
+        <header class="view-header">
+          <h1>Hosts File</h1>
+          <div class="header-actions">
+            <input type="search" id="hosts-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-hosts">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>IP Address</th><th>Hostname</th><th colspan="2">Raw Line</th></tr></thead>
+            <tbody id="hosts-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load hosts file entries.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- STARTUP ITEMS -->
+      <section class="view" id="view-startup-items">
+        <header class="view-header">
+          <h1>Startup Items</h1>
+          <div class="header-actions">
+            <input type="search" id="startup-items-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-startup-items">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Scope</th><th>File</th><th colspan="2">Full Path</th></tr></thead>
+            <tbody id="startup-items-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load startup items.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PIPES -->
+      <section class="view" id="view-pipes">
+        <header class="view-header">
+          <h1>Named Pipes</h1>
+          <div class="header-actions">
+            <input type="search" id="pipes-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-pipes">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th colspan="4">Pipe Name</th></tr></thead>
+            <tbody id="pipes-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load named pipes.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PROGRAMS -->
+      <section class="view" id="view-programs">
+        <header class="view-header">
+          <h1>Installed Programs</h1>
+          <div class="header-actions">
+            <input type="search" id="programs-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-programs">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Version</th><th>Publisher</th><th>Install Location</th></tr></thead>
+            <tbody id="programs-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load installed programs.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CLIPBOARD (privacy-sensitive: explicit reveal, never auto) -->
+      <section class="view" id="view-clipboard">
+        <header class="view-header">
+          <h1>Clipboard</h1>
+        </header>
+        <div class="panel">
+          <p class="muted" style="margin-bottom:14px;">
+            <strong>Privacy-sensitive.</strong> This reads whatever text
+            is currently on your own clipboard. It is never captured
+            automatically — nothing happens here until you click below.
+          </p>
+          <button class="btn btn-primary" id="reveal-clipboard">Reveal current clipboard text</button>
+          <div id="clipboard-content" class="clipboard-box" style="display:none;"></div>
         </div>
       </section>
 

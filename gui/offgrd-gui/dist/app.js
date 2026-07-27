@@ -42,7 +42,15 @@ function stubFor(command) {
     case "list_autoruns":
     case "list_services":
     case "list_certificates":
+    case "list_modules":
+    case "list_sessions":
+    case "list_hosts_entries":
+    case "list_startup_items":
+    case "list_named_pipes":
+    case "list_installed_programs":
       return [];
+    case "get_clipboard_snapshot":
+      return null;
     case "get_monitoring_mode":
       return "normal";
     case "set_monitoring_mode":
@@ -389,6 +397,81 @@ const simpleViews = {
       <td class="mono">${new Date(row.not_after).toLocaleDateString()}</td>
     `,
   },
+  modules: {
+    command: "list_modules",
+    searchId: "modules-search",
+    bodyId: "modules-table-body",
+    columns: 4,
+    matches: (row, q) =>
+      row.module_name.toLowerCase().includes(q) || row.module_path.toLowerCase().includes(q) || String(row.pid).includes(q),
+    renderRow: (row) => `
+      <td class="mono">${row.pid}</td>
+      <td class="mono">${escapeHtml(row.module_name)}</td>
+      <td class="mono">${escapeHtml(row.module_path)}</td>
+      <td class="mono">${row.base_size}</td>
+    `,
+  },
+  sessions: {
+    command: "list_sessions",
+    searchId: "sessions-search",
+    bodyId: "sessions-table-body",
+    columns: 4,
+    matches: (row, q) =>
+      row.station_name.toLowerCase().includes(q) || (row.user_name || "").toLowerCase().includes(q),
+    renderRow: (row) => `
+      <td class="mono">${row.session_id}</td>
+      <td class="mono">${escapeHtml(row.station_name)}</td>
+      <td class="mono">${escapeHtml(row.state)}</td>
+      <td>${escapeHtml(row.user_name || "-")}</td>
+    `,
+  },
+  hosts: {
+    command: "list_hosts_entries",
+    searchId: "hosts-search",
+    bodyId: "hosts-table-body",
+    columns: 4,
+    matches: (row, q) =>
+      row.ip_address.toLowerCase().includes(q) || row.hostname.toLowerCase().includes(q),
+    renderRow: (row) => `
+      <td class="mono">${escapeHtml(row.ip_address)}</td>
+      <td class="mono">${escapeHtml(row.hostname)}</td>
+      <td class="mono" colspan="2">${escapeHtml(row.raw_line)}</td>
+    `,
+  },
+  "startup-items": {
+    command: "list_startup_items",
+    searchId: "startup-items-search",
+    bodyId: "startup-items-table-body",
+    columns: 4,
+    matches: (row, q) => row.file_name.toLowerCase().includes(q),
+    renderRow: (row) => `
+      <td class="mono">${escapeHtml(row.scope)}</td>
+      <td class="mono">${escapeHtml(row.file_name)}</td>
+      <td class="mono" colspan="2">${escapeHtml(row.full_path)}</td>
+    `,
+  },
+  pipes: {
+    command: "list_named_pipes",
+    searchId: "pipes-search",
+    bodyId: "pipes-table-body",
+    columns: 4,
+    matches: (row, q) => row.pipe_name.toLowerCase().includes(q),
+    renderRow: (row) => `<td class="mono" colspan="4">${escapeHtml(row.pipe_name)}</td>`,
+  },
+  programs: {
+    command: "list_installed_programs",
+    searchId: "programs-search",
+    bodyId: "programs-table-body",
+    columns: 4,
+    matches: (row, q) =>
+      row.display_name.toLowerCase().includes(q) || (row.publisher || "").toLowerCase().includes(q),
+    renderRow: (row) => `
+      <td>${escapeHtml(row.display_name)}</td>
+      <td class="mono">${escapeHtml(row.display_version || "-")}</td>
+      <td>${escapeHtml(row.publisher || "-")}</td>
+      <td class="mono">${escapeHtml(row.install_location || "-")}</td>
+    `,
+  },
 };
 
 const simpleViewData = {}; // viewKey -> last-fetched rows, for client-side filtering
@@ -433,6 +516,24 @@ function setupSimpleViews() {
     document
       .getElementById(config.searchId)
       .addEventListener("input", () => renderSimpleView(viewKey));
+  }
+}
+
+// ---------- Clipboard (privacy-sensitive: explicit reveal only) ----------
+
+async function revealClipboard() {
+  const box = document.getElementById("clipboard-content");
+  setConnectionStatus("loading");
+  try {
+    const text = await callBackend("get_clipboard_snapshot");
+    box.style.display = "block";
+    box.textContent = text ? text : "(clipboard is empty or contains no text)";
+    setConnectionStatus("ok");
+  } catch (err) {
+    console.error(err);
+    box.style.display = "block";
+    box.textContent = "Could not read clipboard.";
+    setConnectionStatus("error");
   }
 }
 
@@ -772,6 +873,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("export-processes-csv").addEventListener("click", exportProcessesCsv);
   document.getElementById("export-alerts-json").addEventListener("click", exportAlertsJson);
   document.getElementById("export-alerts-csv").addEventListener("click", exportAlertsCsv);
+  document.getElementById("reveal-clipboard").addEventListener("click", revealClipboard);
 
   setupLiveEvents();
 
