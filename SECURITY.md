@@ -8,7 +8,7 @@ vulnerabilities. Instead:
 - Open a [GitHub Security Advisory](../../security/advisories/new) on
   this repository (preferred — keeps the report private until a fix
   ships), or
-- Email the maintainers at **security@offgrd.online** with a
+- Email the maintainers at **security@offgrid.online** with a
   description of the issue, steps to reproduce, and its potential
   impact.
 

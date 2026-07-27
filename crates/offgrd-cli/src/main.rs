@@ -150,6 +150,50 @@ enum Command {
         #[arg(long)]
         save: bool,
     },
+    /// List loaded modules (DLLs) for every running process (Windows only).
+    Modules {
+        /// Persist observed modules to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
+    /// List active console/RDP sessions (Windows only).
+    Sessions {
+        /// Persist observed sessions to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
+    /// Show parsed entries from the hosts file.
+    Hosts {
+        /// Persist observed entries to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
+    /// List shortcuts/executables in the Startup folders (Windows only).
+    StartupItems {
+        /// Persist observed entries to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
+    /// List named pipes visible under \\.\pipe\ (Windows only).
+    Pipes {
+        /// Persist observed pipes to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
+    /// List installed programs (Add/Remove Programs, Windows only).
+    Programs {
+        /// Persist observed programs to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
+    /// Show the current clipboard's text content, if any (Windows
+    /// only). PRIVACY-SENSITIVE: reads whatever text is currently on
+    /// your clipboard.
+    Clipboard {
+        /// Persist the observed clipboard text to the event store (--db).
+        #[arg(long)]
+        save: bool,
+    },
     /// Export stored events or alerts to a file (JSON, CSV, HTML, or Markdown).
     Export {
         /// What to export.
@@ -206,12 +250,143 @@ async fn main() -> Result<()> {
         Command::Autoruns { save } => run_autoruns(cli.json, save, &cli.db).await,
         Command::Services { save } => run_services(cli.json, save, &cli.db).await,
         Command::Certs { save } => run_certs(cli.json, save, &cli.db).await,
+        Command::Modules { save } => run_simple_collector(
+            "modules", offgrd_collectors::ModulesCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::Sessions { save } => run_simple_collector(
+            "sessions", offgrd_collectors::SessionsCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::Hosts { save } => run_simple_collector(
+            "hosts entries", offgrd_collectors::HostsFileCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::StartupItems { save } => run_simple_collector(
+            "startup items", offgrd_collectors::StartupFolderCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::Pipes { save } => run_simple_collector(
+            "named pipes", offgrd_collectors::NamedPipesCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::Programs { save } => run_simple_collector(
+            "installed programs", offgrd_collectors::InstalledProgramsCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::Clipboard { save } => run_simple_collector(
+            "clipboard snapshot", offgrd_collectors::ClipboardCollector, cli.json, save, &cli.db,
+        ).await,
         Command::Export {
             kind,
             format,
             output,
             limit,
         } => export::run(kind, format, &output, limit, &cli.db),
+    }
+}
+
+/// Generic runner for the newer, simpler snapshot collectors that
+/// don't need a bespoke table layout: runs the collector through a
+/// fresh bus, optionally persists, and prints either JSON (one Event
+/// per line) or a generic `Debug`-based summary line per event. The
+/// earlier collectors (`ps`, `net`, `autoruns`, `services`, `certs`)
+/// keep their own hand-formatted table output (defined above) since
+/// those were written before this helper existed and have real
+/// column layouts worth preserving; new collectors default to this
+/// instead of six more copy-pasted table-printing functions.
+async fn run_simple_collector<C: Collector>(
+    label: &str,
+    collector: C,
+    json: bool,
+    save: bool,
+    db_path: &str,
+) -> Result<()> {
+    let bus = EventBus::new();
+    let mut subscription = bus.subscribe();
+    collector.run(&bus).await?;
+
+    let mut events: Vec<Event> = Vec::new();
+    loop {
+        match subscription.try_recv() {
+            Ok(event) => events.push(event),
+            Err(TryRecvError::Empty) | Err(TryRecvError::Closed) => break,
+            Err(TryRecvError::Lagged(_)) => continue,
+        }
+    }
+
+    if save {
+        let store = EventStore::open(db_path)?;
+        for event in &events {
+            store.insert(event)?;
+        }
+        eprintln!("saved {} {label} to {db_path}", events.len());
+    }
+
+    if json {
+        for event in &events {
+            println!("{}", serde_json::to_string(event)?);
+        }
+        return Ok(());
+    }
+
+    if events.is_empty() {
+        eprintln!("offgrd: no {label} observed.");
+        return Ok(());
+    }
+
+    for event in &events {
+        println!("{}", format_payload_summary(&event.payload));
+    }
+
+    Ok(())
+}
+
+/// A generic one-line human-readable rendering of any payload —
+/// shared by `run_simple_collector` and, if useful later, other
+/// generic display paths. Deliberately not as polished as the
+/// hand-tuned table layouts for `ps`/`net`/`autoruns`/`services`/
+/// `certs`, which have dedicated column formatting instead.
+fn format_payload_summary(payload: &EventPayload) -> String {
+    match payload {
+        EventPayload::ProcessStarted { process } => {
+            format!("[process] pid={} {}", process.pid, process.image_path.as_deref().unwrap_or("-"))
+        }
+        EventPayload::ProcessEnded { pid, .. } => format!("[process] pid={pid} ended"),
+        EventPayload::NetworkConnectionObserved {
+            local_addr, local_port, remote_addr, remote_port, state, ..
+        } => format!("[network] {local_addr}:{local_port} -> {remote_addr}:{remote_port} [{state}]"),
+        EventPayload::AutorunEntryObserved { hive, key_path, value_name, value_data } => {
+            format!("[autorun] {hive}\\{key_path}\\{value_name} = {value_data}")
+        }
+        EventPayload::ServiceObserved { service_name, state, .. } => {
+            format!("[service] {service_name} ({state})")
+        }
+        EventPayload::CertificateObserved { store_name, subject, .. } => {
+            format!("[cert] [{store_name}] {subject}")
+        }
+        EventPayload::LoadedModuleObserved { pid, module_name, module_path, .. } => {
+            format!("[module] pid={pid} {module_name} ({module_path})")
+        }
+        EventPayload::SessionObserved { session_id, state, station_name, user_name } => {
+            format!(
+                "[session] #{session_id} {station_name} [{state}] user={}",
+                user_name.as_deref().unwrap_or("-")
+            )
+        }
+        EventPayload::HostsFileEntryObserved { ip_address, hostname, .. } => {
+            format!("[hosts] {ip_address} -> {hostname}")
+        }
+        EventPayload::StartupFolderEntryObserved { scope, file_name, full_path } => {
+            format!("[startup] [{scope}] {file_name} ({full_path})")
+        }
+        EventPayload::NamedPipeObserved { pipe_name } => format!("[pipe] {pipe_name}"),
+        EventPayload::InstalledProgramObserved { display_name, display_version, publisher, .. } => {
+            format!(
+                "[program] {display_name} {} ({})",
+                display_version.as_deref().unwrap_or(""),
+                publisher.as_deref().unwrap_or("unknown publisher"),
+            )
+        }
+        EventPayload::ClipboardTextObserved { text } => {
+            let preview: String = text.chars().take(80).collect();
+            format!("[clipboard] {preview}{}", if text.chars().count() > 80 { "…" } else { "" })
+        }
+        EventPayload::Note { message } => format!("[note] {message}"),
     }
 }
 

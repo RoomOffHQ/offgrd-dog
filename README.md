@@ -133,6 +133,27 @@ cargo run --bin offgrd -- services --save --json
 # Certificates in ROOT/CA/MY system stores:
 cargo run --bin offgrd -- certs
 cargo run --bin offgrd -- certs --save --json
+
+# Loaded modules (DLLs) per process:
+cargo run --bin offgrd -- modules
+
+# Active console/RDP sessions:
+cargo run --bin offgrd -- sessions
+
+# Hosts file entries (tampering check):
+cargo run --bin offgrd -- hosts
+
+# Startup folder shortcuts:
+cargo run --bin offgrd -- startup-items
+
+# Named pipes:
+cargo run --bin offgrd -- pipes
+
+# Installed programs (Add/Remove Programs):
+cargo run --bin offgrd -- programs
+
+# Clipboard text snapshot (PRIVACY-SENSITIVE — reads your clipboard):
+cargo run --bin offgrd -- clipboard
 ```
 
 ## Run tests (any OS)

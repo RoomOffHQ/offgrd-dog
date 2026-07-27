@@ -144,6 +144,62 @@ fn event_summary(event: &Event) -> (String, String) {
                 not_after.to_rfc3339()
             ),
         ),
+        EventPayload::LoadedModuleObserved {
+            pid,
+            module_name,
+            module_path,
+            ..
+        } => (
+            "LoadedModuleObserved".to_string(),
+            format!("pid={pid} {module_name} ({module_path})"),
+        ),
+        EventPayload::SessionObserved {
+            session_id,
+            state,
+            station_name,
+            user_name,
+        } => (
+            "SessionObserved".to_string(),
+            format!(
+                "session={session_id} state={state} station={station_name} user={}",
+                user_name.as_deref().unwrap_or("")
+            ),
+        ),
+        EventPayload::HostsFileEntryObserved {
+            ip_address,
+            hostname,
+            ..
+        } => (
+            "HostsFileEntryObserved".to_string(),
+            format!("{ip_address} -> {hostname}"),
+        ),
+        EventPayload::StartupFolderEntryObserved {
+            scope,
+            file_name,
+            full_path,
+        } => (
+            "StartupFolderEntryObserved".to_string(),
+            format!("[{scope}] {file_name} ({full_path})"),
+        ),
+        EventPayload::NamedPipeObserved { pipe_name } => {
+            ("NamedPipeObserved".to_string(), pipe_name.clone())
+        }
+        EventPayload::InstalledProgramObserved {
+            display_name,
+            display_version,
+            publisher,
+            ..
+        } => (
+            "InstalledProgramObserved".to_string(),
+            format!(
+                "{display_name} {} ({})",
+                display_version.as_deref().unwrap_or(""),
+                publisher.as_deref().unwrap_or("unknown publisher"),
+            ),
+        ),
+        EventPayload::ClipboardTextObserved { text } => {
+            ("ClipboardTextObserved".to_string(), text.clone())
+        }
         EventPayload::Note { message } => ("Note".to_string(), message.clone()),
     }
 }

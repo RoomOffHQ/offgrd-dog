@@ -155,6 +155,26 @@ expect problems, in rough order of how much I'd bet on each.
   risk than the collectors themselves, since it's only wiring
   already-written Rust collectors into already-proven GUI patterns —
   no new `unsafe` code in this round.
+- [x] **7 new collectors + feature backlog (NEW this round, user-
+  requested "20 more surveillance features, implement in wow order")**:
+  see `docs/feature-backlog.md` for the full ranked list of 20 and
+  which 7 were chosen for this pass (highest wow-to-risk ratio).
+  Implemented: `ModulesCollector` (loaded DLLs per process, injection-
+  detection precursor), `SessionsCollector` (RDP/console sessions),
+  `HostsFileCollector` (tampering monitor, **zero unsafe code**),
+  `StartupFolderCollector` (**zero unsafe code**), `NamedPipesCollector`,
+  `InstalledProgramsCollector`, `ClipboardCollector` (privacy-sensitive,
+  flagged prominently in CLI help text). 3 new `EventCategory` variants
+  (`Sessions`, `Software`, `Clipboard`) and 7 new `EventPayload`
+  variants — required updating the exhaustive matches in
+  `storage.rs` and `export.rs` (Rust's compiler catches every site
+  that needs it). New CLI commands: `offgrd modules|sessions|hosts|
+  startup-items|pipes|programs|clipboard`, all via a new shared
+  `run_simple_collector` helper (rather than 7 more copy-pasted
+  table-printing functions like the earlier collectors have).
+  **GUI wiring for these 7 not done yet** — CLI-only this round, GUI
+  parity (like the round that added Network/Autoruns/Services/
+  Certificates to the GUI) is a natural next step.
 - [x] **Monitoring modes + UX overhaul (NEW this round, user-requested)**:
   - **Three monitoring postures** — Normal (nothing runs in the
     background, fully on-demand — the original behavior), Moderate
@@ -190,6 +210,24 @@ expect problems, in rough order of how much I'd bet on each.
   pausing feature growth.
 
 ## Known gaps / things that will need fixing, flagged in advance
+
+**5 more collectors with new `unsafe` code this round** (Modules,
+Sessions, NamedPipes, InstalledPrograms, Clipboard) — check these
+before the certificate/network/registry ones if something fails,
+since they're the newest. Two specifically worth calling out:
+- **`ClipboardCollector`** does manual pointer arithmetic to find a
+  NUL terminator in locked global memory (`GlobalLock`/`GlobalUnlock`)
+  — the sanity cap at 1,000,000 UTF-16 code units is a deliberate
+  guard against ever unboundedly scanning malformed data, not an
+  arbitrary number to rely on for correctness.
+- **`SessionsCollector`** frees two independent buffers
+  (`WTSEnumerateSessionsW`'s array and `WTSQuerySessionInformationW`'s
+  per-session buffer) via `WTSFreeMemory` — double check neither path
+  double-frees or leaks if you're debugging a crash here.
+
+`HostsFileCollector` and `StartupFolderCollector` have **zero**
+`unsafe` code (pure file I/O) — if something fails there, it's a
+logic bug, not a memory-safety question.
 
 **`CertificatesCollector`'s `unsafe` code is the newest addition,
 check it first if certs-related code fails.** It dereferences a raw

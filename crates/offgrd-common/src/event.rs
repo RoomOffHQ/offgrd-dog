@@ -30,6 +30,9 @@ pub enum EventCategory {
     File,
     Persistence,
     Certificates,
+    Sessions,
+    Software,
+    Clipboard,
     Alert,
 }
 
@@ -120,6 +123,75 @@ pub enum EventPayload {
         thumbprint: String,
         not_before: DateTime<Utc>,
         not_after: DateTime<Utc>,
+    },
+    /// A single loaded module (DLL) observed for a process at
+    /// snapshot time (via Toolhelp32's `Module32First`/`Module32Next`
+    /// — see `offgrd-collectors::ModulesCollector`). A precursor to
+    /// DLL-injection detection: an unexpected module (wrong path,
+    /// unsigned, in a process that shouldn't load it) is one of the
+    /// clearest injection signals, though the actual "is this
+    /// suspicious" judgment is a future rule-engine/correlation
+    /// concern, not this collector's job — it only reports facts.
+    LoadedModuleObserved {
+        pid: u32,
+        module_name: String,
+        module_path: String,
+        base_size: u32,
+    },
+    /// A single active RDP/console session observed at snapshot time
+    /// (via `WTSEnumerateSessionsW` — see
+    /// `offgrd-collectors::SessionsCollector`).
+    SessionObserved {
+        session_id: u32,
+        /// e.g. "Active", "Disconnected", "Listen".
+        state: String,
+        /// e.g. "Console" for the local session, "RDP-Tcp#N" for a
+        /// remote desktop session, or empty for the listener session.
+        station_name: String,
+        user_name: Option<String>,
+    },
+    /// A single line from the hosts file, kept as a raw entry rather
+    /// than pre-judged as "suspicious" — the whole point of this
+    /// collector is visibility, not a verdict (see
+    /// `offgrd-collectors::HostsFileCollector`).
+    HostsFileEntryObserved {
+        ip_address: String,
+        hostname: String,
+        /// The full raw line, for context (comments on the same
+        /// line, original formatting) — `ip_address`/`hostname` are
+        /// parsed out of this for convenience but this preserves the
+        /// source of truth.
+        raw_line: String,
+    },
+    /// A shortcut or executable found directly in a Startup folder
+    /// (`shell:startup` for the current user, or the all-users
+    /// equivalent) — see `offgrd-collectors::StartupFolderCollector`.
+    StartupFolderEntryObserved {
+        /// "CurrentUser" or "AllUsers".
+        scope: String,
+        file_name: String,
+        full_path: String,
+    },
+    /// A single named pipe visible under `\\.\pipe\` — see
+    /// `offgrd-collectors::NamedPipesCollector`.
+    NamedPipeObserved {
+        pipe_name: String,
+    },
+    /// A single entry from the registry's "Add/Remove Programs" list
+    /// — see `offgrd-collectors::InstalledProgramsCollector`.
+    InstalledProgramObserved {
+        display_name: String,
+        display_version: Option<String>,
+        publisher: Option<String>,
+        install_location: Option<String>,
+    },
+    /// A snapshot of the current clipboard's text content, if any —
+    /// see `offgrd-collectors::ClipboardCollector`. Text formats only
+    /// for this first pass (no images/files); a genuinely
+    /// privacy-sensitive capability, flagged prominently in the CLI
+    /// help text and GUI, not silently collected.
+    ClipboardTextObserved {
+        text: String,
     },
     /// Placeholder variants for modules not yet implemented — kept
     /// here so the schema shape is stable and future collectors slot

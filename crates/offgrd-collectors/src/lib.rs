@@ -3,29 +3,44 @@
 //! none of them duplicate raw Win32/ETW code.
 //!
 //! Unlike `offgrd-common`/`offgrd-core`/`offgrd-rules`, this crate
-//! does NOT `forbid(unsafe_code)` at the root: `platform/windows.rs`
-//! legitimately needs `unsafe` to call Win32 APIs, and `forbid` (as
+//! does NOT `forbid(unsafe_code)` at the root: several modules
+//! legitimately need `unsafe` to call Win32 APIs, and `forbid` (as
 //! opposed to `deny`) can't be locally overridden per-module. Every
-//! `unsafe` block in this crate has a `// SAFETY:` comment; see
-//! `platform/windows.rs` and `etw_collector.rs`.
+//! `unsafe` block in this crate has a `// SAFETY:` comment. See
+//! `docs/collectors.md` at the repo root for a full per-collector
+//! reference (data source, schema, privileges, known limitations).
 
 pub mod autoruns;
 pub mod certificates;
+pub mod clipboard;
+pub mod hosts_file;
+pub mod installed_programs;
+pub mod modules;
+pub mod named_pipes;
 pub mod network_snapshot;
 pub mod platform;
 pub mod poll_diff;
 pub mod process_snapshot;
 pub mod services;
+pub mod sessions;
+pub mod startup_folder;
 
 #[cfg(windows)]
 pub mod etw_collector;
 
 pub use autoruns::AutorunsCollector;
 pub use certificates::CertificatesCollector;
+pub use clipboard::ClipboardCollector;
+pub use hosts_file::HostsFileCollector;
+pub use installed_programs::InstalledProgramsCollector;
+pub use modules::ModulesCollector;
+pub use named_pipes::NamedPipesCollector;
 pub use network_snapshot::NetworkSnapshotCollector;
 pub use poll_diff::{PollDiffer, PollTick};
 pub use process_snapshot::ProcessSnapshotCollector;
 pub use services::ServicesCollector;
+pub use sessions::SessionsCollector;
+pub use startup_folder::StartupFolderCollector;
 
 #[cfg(windows)]
 pub use etw_collector::EtwProcessCollector;

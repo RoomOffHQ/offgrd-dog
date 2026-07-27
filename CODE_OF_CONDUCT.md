@@ -24,7 +24,7 @@ appearance.
 ## Enforcement
 
 Violations can be reported privately to the maintainers at
-**security@offgrd.online** (see `SECURITY.md`). Maintainers will
+**security@offgrid.online** (see `SECURITY.md`). Maintainers will
 investigate and respond proportionally, up to and including permanent
 bans from project spaces.
 

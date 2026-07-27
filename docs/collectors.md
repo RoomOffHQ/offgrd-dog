@@ -119,6 +119,83 @@ build status.
     used only as a display/lookup identifier, never for any actual
     trust/security decision.
 
+## ModulesCollector
+
+- **File**: `modules.rs`
+- **Data source**: Toolhelp32, `Module32First`/`Module32Next` per pid
+  (reuses `platform::list_processes()` to get the pid list)
+- **Privileges required**: None for most processes; some
+  protected/system processes can't be snapshotted, silently skipped
+- **Payload**: `EventPayload::LoadedModuleObserved { pid, module_name,
+  module_path, base_size }`
+- **Known limitations**: One events-per-pid loop, so scanning every
+  process on a busy machine is noticeably slower than the other
+  snapshot collectors — no batching/parallelism yet.
+
+## SessionsCollector
+
+- **File**: `sessions.rs`
+- **Data source**: `WTSEnumerateSessionsW`/`WTSQuerySessionInformationW`
+- **Privileges required**: None to enumerate sessions on the local machine
+- **Payload**: `EventPayload::SessionObserved { session_id, state,
+  station_name, user_name }`
+- **Known limitations**: Local machine only (no remote server query).
+
+## HostsFileCollector
+
+- **File**: `hosts_file.rs`
+- **Data source**: Plain text file read of
+  `%SystemRoot%\System32\drivers\etc\hosts`
+- **Privileges required**: None to read
+- **Payload**: `EventPayload::HostsFileEntryObserved { ip_address,
+  hostname, raw_line }`
+- **Notable**: Zero `unsafe` code — pure file I/O and string parsing.
+  3 unit tests covering comment/blank-line handling and one-IP-to-
+  many-hostnames lines.
+
+## StartupFolderCollector
+
+- **File**: `startup_folder.rs`
+- **Data source**: Filesystem enumeration of `%APPDATA%\Microsoft\
+  Windows\Start Menu\Programs\Startup` and the `%ProgramData%`
+  equivalent
+- **Privileges required**: None to read
+- **Payload**: `EventPayload::StartupFolderEntryObserved { scope,
+  file_name, full_path }`
+- **Notable**: Zero `unsafe` code. Filters out `desktop.ini` (a benign
+  Explorer artifact, not a real startup entry).
+
+## NamedPipesCollector
+
+- **File**: `named_pipes.rs`
+- **Data source**: `FindFirstFileW`/`FindNextFileW` over `\\.\pipe\*`
+- **Privileges required**: None (visibility only, not access)
+- **Payload**: `EventPayload::NamedPipeObserved { pipe_name }`
+
+## InstalledProgramsCollector
+
+- **File**: `installed_programs.rs`
+- **Data source**: Registry `...\CurrentVersion\Uninstall` keys under
+  `HKLM` (both 64-bit and `WOW6432Node` 32-bit views)
+- **Privileges required**: None to read
+- **Payload**: `EventPayload::InstalledProgramObserved { display_name,
+  display_version, publisher, install_location }`
+- **Known limitations**: HKLM only (system-wide installs); per-user
+  installs under `HKCU` aren't checked yet.
+
+## ClipboardCollector
+
+- **File**: `clipboard.rs`
+- **Data source**: `OpenClipboard`/`GetClipboardData(CF_UNICODETEXT)`
+- **Privileges required**: None
+- **Payload**: `EventPayload::ClipboardTextObserved { text }`
+- **⚠️ Privacy-sensitive**: reads whatever text is currently on the
+  user's own clipboard. Flagged prominently in the CLI help text
+  (`offgrd clipboard --help`) and should be equally prominent in any
+  GUI surface for it — never a silent background capability.
+- **Known limitations**: Text (`CF_UNICODETEXT`) only — no images,
+  file lists, or other clipboard formats.
+
 ## PollDiffer (shared utility, not a collector itself)
 
 - **File**: `poll_diff.rs`

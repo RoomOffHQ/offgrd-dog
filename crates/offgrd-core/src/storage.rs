@@ -261,6 +261,9 @@ fn category_label(category: EventCategory) -> &'static str {
         EventCategory::File => "file",
         EventCategory::Persistence => "persistence",
         EventCategory::Certificates => "certificates",
+        EventCategory::Sessions => "sessions",
+        EventCategory::Software => "software",
+        EventCategory::Clipboard => "clipboard",
         EventCategory::Alert => "alert",
     }
 }
@@ -274,6 +277,9 @@ fn parse_category(s: &str) -> Result<EventCategory> {
         "file" => EventCategory::File,
         "persistence" => EventCategory::Persistence,
         "certificates" => EventCategory::Certificates,
+        "sessions" => EventCategory::Sessions,
+        "software" => EventCategory::Software,
+        "clipboard" => EventCategory::Clipboard,
         "alert" => EventCategory::Alert,
         other => anyhow::bail!("unknown stored event category: {other}"),
     })
