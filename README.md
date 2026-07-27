@@ -154,6 +154,24 @@ cargo run --bin offgrd -- programs
 
 # Clipboard text snapshot (PRIVACY-SENSITIVE — reads your clipboard):
 cargo run --bin offgrd -- clipboard
+
+# Local user accounts & groups:
+cargo run --bin offgrd -- accounts
+
+# Network (SMB) shares:
+cargo run --bin offgrd -- shares
+
+# Current foreground window (one-shot, never continuous):
+cargo run --bin offgrd -- foreground
+
+# This process's environment variables:
+cargo run --bin offgrd -- env
+
+# Local DNS resolver cache:
+cargo run --bin offgrd -- dns-cache
+
+# Idle time:
+cargo run --bin offgrd -- idle
 ```
 
 ## Run tests (any OS)

@@ -1,12 +1,13 @@
 # 20 Additional Surveillance Features — Ranked by "Wow", Implementation Status
 
 Brainstormed per your request, ranked roughly by visual/security impact
-("wow factor") tempered by implementation risk. The top 7 are
-implemented this round (collector + CLI command; GUI wiring next).
-The rest are scoped and queued — most need either COM interop
-(Task Scheduler, WMI) or a genuinely new API family (WLAN, Event Log)
-that deserve their own careful pass rather than being rushed in
-alongside 7 others.
+("wow factor") tempered by implementation risk. **13 of 20 are now
+implemented** (7 in the first pass, 6 more in a second pass covering
+everything that didn't need COM/WMI/a new complex API family). The
+remaining 7 (Scheduled Tasks, TPM/BitLocker, Event Log, WiFi, USB live,
+browser extensions, Bluetooth) genuinely need either COM interop or a
+new API family each and are queued for their own dedicated passes
+rather than being rushed in alongside everything else.
 
 | # | Feature | Wow | Status | Why / API |
 |---|---|---|---|---|
@@ -22,14 +23,14 @@ alongside 7 others.
 | 10 | Windows Event Log tail (Security channel) | ★★★★★ | 🔜 Queued | Extremely high value (logon events, privilege use) but the `EvtQuery`/`EvtNext` API is a bigger lift than anything implemented so far. |
 | 11 | WiFi networks (visible + connected SSIDs) | ★★★★☆ | 🔜 Queued | Very visual/relatable, needs the WLAN API (`WlanOpenHandle`/`WlanGetNetworkBssList`) — a new API family. |
 | 12 | USB device insertion/removal (live) | ★★★★☆ | 🔜 Queued | Needs either `WM_DEVICECHANGE` window-message plumbing or SetupAPI device notifications — a different collector shape (event-driven, not snapshot-poll). |
-| 13 | Local user accounts & groups | ★★★☆☆ | 🔜 Queued | `NetUserEnum`/`NetLocalGroupEnum` — moderate new API surface, good security value (hidden accounts, group membership changes). |
+| 13 | Local user accounts & groups | ★★★☆☆ | ✅ Implemented | `NetUserEnum`/`NetLocalGroupEnum` — moderate new API surface, good security value (hidden accounts, group membership changes). |
 | 14 | Browser extensions inspector | ★★★☆☆ | 🔜 Queued | High privacy relevance, but needs per-browser JSON/SQLite parsing (Chrome/Edge/Firefox each differ) — more parsing work than API work. |
-| 15 | Network shares (`NetShareEnum`) | ★★★☆☆ | 🔜 Queued | Reveals unexpected file sharing; moderate new API. |
-| 16 | Foreground/active window tracker | ★★★☆☆ | 🔜 Queued | Simple API (`GetForegroundWindow`) but raises "is this basically a keylogger-adjacent feature" UX/ethics questions worth thinking through in the design, not just the code. |
-| 17 | Environment variables inspector (PATH hijacking) | ★★☆☆☆ | 🔜 Queued | Easy (`GetEnvironmentStringsW`) but narrower attack surface than most items above. |
-| 18 | DNS cache viewer | ★★★☆☆ | 🔜 Queued | The real API (`DnsGetCacheDataTable`) is undocumented/fragile; pragmatic fallback is shelling out to `ipconfig /displaydns` and parsing text — noted as a deliberate compromise if implemented. |
+| 15 | Network shares (`NetShareEnum`) | ★★★☆☆ | ✅ Implemented | Reveals unexpected file sharing; moderate new API. |
+| 16 | Foreground/active window tracker | ★★★☆☆ | ✅ Implemented | Simple API (`GetForegroundWindow`) but raises "is this basically a keylogger-adjacent feature" UX/ethics questions worth thinking through in the design, not just the code. |
+| 17 | Environment variables inspector (PATH hijacking) | ★★☆☆☆ | ✅ Implemented | Easy (`GetEnvironmentStringsW`) but narrower attack surface than most items above. |
+| 18 | DNS cache viewer | ★★★☆☆ | ✅ Implemented | The real API (`DnsGetCacheDataTable`) is undocumented/fragile; pragmatic fallback is shelling out to `ipconfig /displaydns` and parsing text — noted as a deliberate compromise if implemented. |
 | 19 | Bluetooth paired/nearby devices | ★★☆☆☆ | 🔜 Queued | Real but niche; Windows Bluetooth API is more involved than WiFi's. |
-| 20 | Idle time / screen lock state | ★★☆☆☆ | 🔜 Queued | `GetLastInputInfo` — trivial API, lowest security relevance of the 20. |
+| 20 | Idle time / screen lock state | ★★☆☆☆ | ✅ Implemented | `GetLastInputInfo` — trivial API, lowest security relevance of the 20. |
 
 See `docs/collectors.md` for the same "how to add a collector" checklist
 these 7 new ones followed, and `WIP.md` for the usual honesty caveats

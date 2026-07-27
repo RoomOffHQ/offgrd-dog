@@ -33,6 +33,9 @@ pub enum EventCategory {
     Sessions,
     Software,
     Clipboard,
+    Accounts,
+    Activity,
+    Environment,
     Alert,
 }
 
@@ -192,6 +195,59 @@ pub enum EventPayload {
     /// help text and GUI, not silently collected.
     ClipboardTextObserved {
         text: String,
+    },
+    /// A local user account or group observed at snapshot time (via
+    /// `NetUserEnum`/`NetLocalGroupEnum` — see
+    /// `offgrd-collectors::LocalAccountsCollector`).
+    LocalAccountObserved {
+        /// "User" or "Group".
+        kind: String,
+        name: String,
+        /// For users: whether the account is disabled. `None` for groups.
+        disabled: Option<bool>,
+        comment: Option<String>,
+    },
+    /// A single SMB/network share observed at snapshot time (via
+    /// `NetShareEnum` — see `offgrd-collectors::NetworkSharesCollector`).
+    NetworkShareObserved {
+        share_name: String,
+        local_path: Option<String>,
+        comment: Option<String>,
+    },
+    /// The current foreground (focused) window at snapshot time (via
+    /// `GetForegroundWindow` — see
+    /// `offgrd-collectors::ForegroundWindowCollector`). Deliberately
+    /// point-in-time only, not a continuous tracker — see that
+    /// collector's doc comment for the UX/ethics reasoning.
+    ForegroundWindowObserved {
+        window_title: String,
+        pid: Option<u32>,
+        process_image_path: Option<String>,
+    },
+    /// A single process environment variable (see
+    /// `offgrd-collectors::EnvironmentCollector`) — this process's own
+    /// environment only, not another process's (reading another
+    /// process's environment block needs the same
+    /// PEB-reading-via-undocumented-API concern already noted for
+    /// command lines; deliberately not attempted).
+    EnvironmentVariableObserved {
+        name: String,
+        value: String,
+    },
+    /// A single resolved-hostname entry from the local DNS resolver
+    /// cache (see `offgrd-collectors::DnsCacheCollector`). Parsed from
+    /// `ipconfig /displaydns` output rather than the undocumented
+    /// `DnsGetCacheDataTable` API — a deliberate pragmatic tradeoff,
+    /// see that collector's doc comment.
+    DnsCacheEntryObserved {
+        hostname: String,
+        record_type: String,
+        data: String,
+    },
+    /// System idle/input state at snapshot time (via
+    /// `GetLastInputInfo` — see `offgrd-collectors::IdleTimeCollector`).
+    IdleStateObserved {
+        idle_seconds: u64,
     },
     /// Placeholder variants for modules not yet implemented — kept
     /// here so the schema shape is stable and future collectors slot

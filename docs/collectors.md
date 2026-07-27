@@ -196,6 +196,69 @@ build status.
 - **Known limitations**: Text (`CF_UNICODETEXT`) only — no images,
   file lists, or other clipboard formats.
 
+## LocalAccountsCollector
+
+- **File**: `local_accounts.rs`
+- **Data source**: Windows Net API, `NetUserEnum`/`NetLocalGroupEnum`
+- **Privileges required**: None to enumerate on the local machine
+- **Payload**: `EventPayload::LocalAccountObserved { kind, name,
+  disabled, comment }`
+
+## NetworkSharesCollector
+
+- **File**: `network_shares.rs`
+- **Data source**: Windows Net API, `NetShareEnum`
+- **Privileges required**: None to enumerate
+- **Payload**: `EventPayload::NetworkShareObserved { share_name,
+  local_path, comment }`
+
+## ForegroundWindowCollector
+
+- **File**: `foreground_window.rs`
+- **Data source**: `GetForegroundWindow`/`GetWindowTextW`/
+  `GetWindowThreadProcessId`
+- **Privileges required**: None
+- **Payload**: `EventPayload::ForegroundWindowObserved { window_title,
+  pid, process_image_path }`
+- **⚠️ Deliberately snapshot-only, never a continuous tracker** — see
+  the module's doc comment for the keylogger-adjacency reasoning. If
+  you're extending this project, do not turn this into a background
+  poll loop that records history without thinking through that
+  tradeoff explicitly first.
+
+## EnvironmentCollector
+
+- **File**: `environment.rs`
+- **Data source**: `std::env::vars()` (this process's own environment)
+- **Privileges required**: None
+- **Payload**: `EventPayload::EnvironmentVariableObserved { name, value }`
+- **Notable**: Zero `unsafe` code. Only this process's own inherited
+  environment — reading another process's environment block needs the
+  same PEB-access concerns already noted for command lines elsewhere,
+  deliberately not attempted.
+
+## DnsCacheCollector
+
+- **File**: `dns_cache.rs`
+- **Data source**: Parses `ipconfig /displaydns` text output
+- **Privileges required**: None
+- **Payload**: `EventPayload::DnsCacheEntryObserved { hostname,
+  record_type, data }`
+- **Notable**: Zero `unsafe` code. Deliberately avoids the
+  undocumented `DnsGetCacheDataTable` API in favor of a documented,
+  stable command — see the module's doc comment for the full
+  reasoning. 3 unit tests covering single/multiple entries and empty
+  input.
+
+## IdleTimeCollector
+
+- **File**: `idle_time.rs`
+- **Data source**: `GetLastInputInfo`/`GetTickCount`
+- **Privileges required**: None
+- **Payload**: `EventPayload::IdleStateObserved { idle_seconds }`
+- **Notable**: Lowest security relevance of any collector in the
+  project; included as cheap context alongside Sessions.
+
 ## PollDiffer (shared utility, not a collector itself)
 
 - **File**: `poll_diff.rs`

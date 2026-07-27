@@ -194,6 +194,36 @@ enum Command {
         #[arg(long)]
         save: bool,
     },
+    /// List local user accounts and groups (Windows only).
+    Accounts {
+        #[arg(long)]
+        save: bool,
+    },
+    /// List local network (SMB) shares (Windows only).
+    Shares {
+        #[arg(long)]
+        save: bool,
+    },
+    /// Show the current foreground window, once (Windows only).
+    Foreground {
+        #[arg(long)]
+        save: bool,
+    },
+    /// Show this process's environment variables.
+    Env {
+        #[arg(long)]
+        save: bool,
+    },
+    /// Show the local DNS resolver cache (via `ipconfig /displaydns`).
+    DnsCache {
+        #[arg(long)]
+        save: bool,
+    },
+    /// Show how long the machine has been idle (Windows only).
+    Idle {
+        #[arg(long)]
+        save: bool,
+    },
     /// Export stored events or alerts to a file (JSON, CSV, HTML, or Markdown).
     Export {
         /// What to export.
@@ -270,6 +300,24 @@ async fn main() -> Result<()> {
         ).await,
         Command::Clipboard { save } => run_simple_collector(
             "clipboard snapshot", offgrd_collectors::ClipboardCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::Accounts { save } => run_simple_collector(
+            "local accounts", offgrd_collectors::LocalAccountsCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::Shares { save } => run_simple_collector(
+            "network shares", offgrd_collectors::NetworkSharesCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::Foreground { save } => run_simple_collector(
+            "foreground window", offgrd_collectors::ForegroundWindowCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::Env { save } => run_simple_collector(
+            "environment variables", offgrd_collectors::EnvironmentCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::DnsCache { save } => run_simple_collector(
+            "DNS cache entries", offgrd_collectors::DnsCacheCollector, cli.json, save, &cli.db,
+        ).await,
+        Command::Idle { save } => run_simple_collector(
+            "idle state", offgrd_collectors::IdleTimeCollector, cli.json, save, &cli.db,
         ).await,
         Command::Export {
             kind,
@@ -385,6 +433,24 @@ fn format_payload_summary(payload: &EventPayload) -> String {
         EventPayload::ClipboardTextObserved { text } => {
             let preview: String = text.chars().take(80).collect();
             format!("[clipboard] {preview}{}", if text.chars().count() > 80 { "…" } else { "" })
+        }
+        EventPayload::LocalAccountObserved { kind, name, disabled, .. } => {
+            format!("[account] [{kind}] {name}{}", if disabled == &Some(true) { " (disabled)" } else { "" })
+        }
+        EventPayload::NetworkShareObserved { share_name, local_path, .. } => {
+            format!("[share] {share_name} -> {}", local_path.as_deref().unwrap_or("-"))
+        }
+        EventPayload::ForegroundWindowObserved { window_title, pid, .. } => {
+            format!("[foreground] \"{window_title}\" pid={}", pid.map(|p| p.to_string()).unwrap_or_else(|| "-".into()))
+        }
+        EventPayload::EnvironmentVariableObserved { name, value } => {
+            format!("[env] {name}={value}")
+        }
+        EventPayload::DnsCacheEntryObserved { hostname, record_type, data } => {
+            format!("[dns-cache] {hostname} {record_type} {data}")
+        }
+        EventPayload::IdleStateObserved { idle_seconds } => {
+            format!("[idle] {idle_seconds}s")
         }
         EventPayload::Note { message } => format!("[note] {message}"),
     }

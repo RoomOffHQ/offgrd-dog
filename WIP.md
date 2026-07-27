@@ -190,6 +190,23 @@ expect problems, in rough order of how much I'd bet on each.
   System / Configuration) now that it's 15 items — plus
   `overflow-y: auto` on the nav so it scrolls instead of overflowing
   the window on smaller screens.
+- [x] **6 more collectors from the backlog (NEW this round)**: Local
+  Accounts (`NetUserEnum`/`NetLocalGroupEnum`), Network Shares
+  (`NetShareEnum`), Foreground Window (**deliberately snapshot-only,
+  never a continuous tracker** — see the module's doc comment on why
+  a continuous version would be keylogger-adjacent), Environment
+  Variables (**zero unsafe code**, this process's own environment
+  only), DNS Cache (**zero unsafe code**, parses `ipconfig
+  /displaydns` rather than the undocumented `DnsGetCacheDataTable`
+  API — 3 unit tests), Idle Time (`GetLastInputInfo`). 3 more
+  `EventCategory` variants (`Accounts`, `Activity`, `Environment`) and
+  6 more `EventPayload` variants — same exhaustive-match discipline as
+  before. New CLI commands: `offgrd accounts|shares|foreground|env|
+  dns-cache|idle`. GUI wiring **not done for these 6** — CLI-only this
+  round; `docs/feature-backlog.md` updated to reflect 13/20 items now
+  implemented, 7 still queued (all genuinely need COM/WMI/a new API
+  family — Scheduled Tasks, TPM/BitLocker, Event Log, WiFi, live USB,
+  browser extensions, Bluetooth).
 - [x] **Monitoring modes + UX overhaul (NEW this round, user-requested)**:
   - **Three monitoring postures** — Normal (nothing runs in the
     background, fully on-demand — the original behavior), Moderate
@@ -225,6 +242,15 @@ expect problems, in rough order of how much I'd bet on each.
   pausing feature growth.
 
 ## Known gaps / things that will need fixing, flagged in advance
+
+**4 more collectors with new `unsafe` code this round** (LocalAccounts,
+NetworkShares, ForegroundWindow, IdleTime) — check these first if
+something in this batch fails. `LocalAccountsCollector` and
+`NetworkSharesCollector` both use the Net API's buffer-allocation
+pattern (`NetApiBufferFree`) for the first time in this project —
+structurally similar to the SCM/registry buffer patterns already
+used, but a new API family nonetheless. `DnsCacheCollector` and
+`EnvironmentCollector` have **zero** `unsafe` code.
 
 **5 more collectors with new `unsafe` code this round** (Modules,
 Sessions, NamedPipes, InstalledPrograms, Clipboard) — check these

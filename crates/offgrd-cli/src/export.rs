@@ -200,6 +200,42 @@ fn event_summary(event: &Event) -> (String, String) {
         EventPayload::ClipboardTextObserved { text } => {
             ("ClipboardTextObserved".to_string(), text.clone())
         }
+        EventPayload::LocalAccountObserved { kind, name, disabled, comment } => (
+            "LocalAccountObserved".to_string(),
+            format!(
+                "[{kind}] {name} disabled={} {}",
+                disabled.map(|d| d.to_string()).unwrap_or_default(),
+                comment.as_deref().unwrap_or(""),
+            ),
+        ),
+        EventPayload::NetworkShareObserved { share_name, local_path, comment } => (
+            "NetworkShareObserved".to_string(),
+            format!(
+                "{share_name} -> {} {}",
+                local_path.as_deref().unwrap_or(""),
+                comment.as_deref().unwrap_or(""),
+            ),
+        ),
+        EventPayload::ForegroundWindowObserved { window_title, pid, process_image_path } => (
+            "ForegroundWindowObserved".to_string(),
+            format!(
+                "\"{window_title}\" pid={} {}",
+                pid.map(|p| p.to_string()).unwrap_or_default(),
+                process_image_path.as_deref().unwrap_or(""),
+            ),
+        ),
+        EventPayload::EnvironmentVariableObserved { name, value } => (
+            "EnvironmentVariableObserved".to_string(),
+            format!("{name}={value}"),
+        ),
+        EventPayload::DnsCacheEntryObserved { hostname, record_type, data } => (
+            "DnsCacheEntryObserved".to_string(),
+            format!("{hostname} {record_type} {data}"),
+        ),
+        EventPayload::IdleStateObserved { idle_seconds } => (
+            "IdleStateObserved".to_string(),
+            format!("{idle_seconds}s idle"),
+        ),
         EventPayload::Note { message } => ("Note".to_string(), message.clone()),
     }
 }
