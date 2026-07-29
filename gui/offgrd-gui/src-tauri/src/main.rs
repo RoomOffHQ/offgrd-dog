@@ -243,6 +243,132 @@ fn set_monitoring_mode(mode: MonitoringMode, state: tauri::State<'_, MonitoringS
 }
 
 #[derive(Serialize, Clone)]
+struct LocalAccountDto {
+    kind: String,
+    name: String,
+    disabled: Option<bool>,
+    comment: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+struct NetworkShareDto {
+    share_name: String,
+    local_path: Option<String>,
+    comment: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+struct ForegroundWindowDto {
+    window_title: String,
+    pid: Option<u32>,
+    process_image_path: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+struct EnvironmentVariableDto {
+    name: String,
+    value: String,
+}
+
+#[derive(Serialize, Clone)]
+struct DnsCacheEntryDto {
+    hostname: String,
+    record_type: String,
+    data: String,
+}
+
+#[derive(Serialize, Clone)]
+struct IdleStateDto {
+    idle_seconds: u64,
+}
+
+#[tauri::command]
+async fn list_local_accounts() -> Result<Vec<LocalAccountDto>, String> {
+    collect_and_extract(offgrd_collectors::LocalAccountsCollector, |event| match &event.payload {
+        EventPayload::LocalAccountObserved { kind, name, disabled, comment } => {
+            Some(LocalAccountDto {
+                kind: kind.clone(),
+                name: name.clone(),
+                disabled: *disabled,
+                comment: comment.clone(),
+            })
+        }
+        _ => None,
+    })
+    .await
+}
+
+#[tauri::command]
+async fn list_network_shares() -> Result<Vec<NetworkShareDto>, String> {
+    collect_and_extract(offgrd_collectors::NetworkSharesCollector, |event| match &event.payload {
+        EventPayload::NetworkShareObserved { share_name, local_path, comment } => {
+            Some(NetworkShareDto {
+                share_name: share_name.clone(),
+                local_path: local_path.clone(),
+                comment: comment.clone(),
+            })
+        }
+        _ => None,
+    })
+    .await
+}
+
+/// Single-shot, explicit-only, matching the CLI's `offgrd foreground`
+/// — never called by the live monitor or an auto-refresh path, same
+/// reasoning as `get_clipboard_snapshot`.
+#[tauri::command]
+async fn get_foreground_window() -> Result<Option<ForegroundWindowDto>, String> {
+    let results = collect_and_extract(offgrd_collectors::ForegroundWindowCollector, |event| match &event.payload {
+        EventPayload::ForegroundWindowObserved { window_title, pid, process_image_path } => {
+            Some(ForegroundWindowDto {
+                window_title: window_title.clone(),
+                pid: *pid,
+                process_image_path: process_image_path.clone(),
+            })
+        }
+        _ => None,
+    })
+    .await?;
+    Ok(results.into_iter().next())
+}
+
+#[tauri::command]
+async fn list_environment_variables() -> Result<Vec<EnvironmentVariableDto>, String> {
+    collect_and_extract(offgrd_collectors::EnvironmentCollector, |event| match &event.payload {
+        EventPayload::EnvironmentVariableObserved { name, value } => {
+            Some(EnvironmentVariableDto { name: name.clone(), value: value.clone() })
+        }
+        _ => None,
+    })
+    .await
+}
+
+#[tauri::command]
+async fn list_dns_cache() -> Result<Vec<DnsCacheEntryDto>, String> {
+    collect_and_extract(offgrd_collectors::DnsCacheCollector, |event| match &event.payload {
+        EventPayload::DnsCacheEntryObserved { hostname, record_type, data } => {
+            Some(DnsCacheEntryDto {
+                hostname: hostname.clone(),
+                record_type: record_type.clone(),
+                data: data.clone(),
+            })
+        }
+        _ => None,
+    })
+    .await
+}
+
+#[tauri::command]
+async fn get_idle_state() -> Result<Option<IdleStateDto>, String> {
+    let results = collect_and_extract(offgrd_collectors::IdleTimeCollector, |event| match &event.payload {
+        EventPayload::IdleStateObserved { idle_seconds } => Some(IdleStateDto { idle_seconds: *idle_seconds }),
+        _ => None,
+    })
+    .await?;
+    Ok(results.into_iter().next())
+}
+
+#[derive(Serialize, Clone)]
 struct ModuleDto {
     pid: u32,
     module_name: String,
@@ -667,6 +793,12 @@ fn main() {
             list_named_pipes,
             list_installed_programs,
             get_clipboard_snapshot,
+            list_local_accounts,
+            list_network_shares,
+            get_foreground_window,
+            list_environment_variables,
+            list_dns_cache,
+            get_idle_state,
             get_monitoring_mode,
             set_monitoring_mode,
         ])

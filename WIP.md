@@ -207,6 +207,16 @@ expect problems, in rough order of how much I'd bet on each.
   implemented, 7 still queued (all genuinely need COM/WMI/a new API
   family — Scheduled Tasks, TPM/BitLocker, Event Log, WiFi, live USB,
   browser extensions, Bluetooth).
+- [x] **GUI wiring for the 6 newest collectors (NEW this round)** —
+  Accounts/Shares/DNS Cache got the standard `simpleViews` table
+  treatment. **Foreground Window and Idle Time got the same
+  "explicit action, not auto-refresh" treatment as Clipboard** (a
+  "Check now" button, no live/auto-refresh path) — Foreground Window
+  in particular, given the keylogger-adjacency concern already noted
+  in its module doc comment. Sidebar gained an "Activity" section for
+  these three. 6 new Tauri commands
+  (`list_local_accounts`/`list_network_shares`/`get_foreground_window`/
+  `list_environment_variables`/`list_dns_cache`/`get_idle_state`).
 - [x] **Monitoring modes + UX overhaul (NEW this round, user-requested)**:
   - **Three monitoring postures** — Normal (nothing runs in the
     background, fully on-demand — the original behavior), Moderate

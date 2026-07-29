@@ -43,6 +43,15 @@
         <button class="nav-item" data-view="hosts">
           <span class="nav-icon">◎</span> Hosts File
         </button>
+        <button class="nav-item" data-view="accounts">
+          <span class="nav-icon">◐</span> Accounts
+        </button>
+        <button class="nav-item" data-view="shares">
+          <span class="nav-icon">▨</span> Shares
+        </button>
+        <button class="nav-item" data-view="dns-cache">
+          <span class="nav-icon">◇</span> DNS Cache
+        </button>
 
         <div class="nav-section-label">Persistence</div>
         <button class="nav-item" data-view="autoruns">
@@ -67,6 +76,17 @@
         </button>
         <button class="nav-item" data-view="clipboard">
           <span class="nav-icon">⧉</span> Clipboard
+        </button>
+
+        <div class="nav-section-label">Activity</div>
+        <button class="nav-item" data-view="foreground">
+          <span class="nav-icon">▭</span> Foreground Window
+        </button>
+        <button class="nav-item" data-view="environment">
+          <span class="nav-icon">▤</span> Environment
+        </button>
+        <button class="nav-item" data-view="idle">
+          <span class="nav-icon">◔</span> Idle Time
         </button>
 
         <div class="nav-section-label">Configuration</div>
@@ -429,6 +449,109 @@
           </p>
           <button class="btn btn-primary" id="reveal-clipboard">Reveal current clipboard text</button>
           <div id="clipboard-content" class="clipboard-box" style="display:none;"></div>
+        </div>
+      </section>
+
+      <!-- ACCOUNTS -->
+      <section class="view" id="view-accounts">
+        <header class="view-header">
+          <h1>Local Accounts &amp; Groups</h1>
+          <div class="header-actions">
+            <input type="search" id="accounts-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-accounts">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Kind</th><th>Name</th><th>Disabled</th><th>Comment</th></tr></thead>
+            <tbody id="accounts-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load accounts.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SHARES -->
+      <section class="view" id="view-shares">
+        <header class="view-header">
+          <h1>Network Shares</h1>
+          <div class="header-actions">
+            <input type="search" id="shares-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-shares">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Share</th><th>Local Path</th><th colspan="2">Comment</th></tr></thead>
+            <tbody id="shares-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load shares.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- DNS CACHE -->
+      <section class="view" id="view-dns-cache">
+        <header class="view-header">
+          <h1>DNS Cache</h1>
+          <div class="header-actions">
+            <input type="search" id="dns-cache-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-dns-cache">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Hostname</th><th>Type</th><th colspan="2">Data</th></tr></thead>
+            <tbody id="dns-cache-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load the DNS cache.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- FOREGROUND WINDOW (one-shot, never continuous) -->
+      <section class="view" id="view-foreground">
+        <header class="view-header">
+          <h1>Foreground Window</h1>
+        </header>
+        <div class="panel">
+          <p class="muted" style="margin-bottom:14px;">
+            One-shot snapshot of whatever window has focus right now —
+            deliberately not a continuous tracker (see
+            <code>docs/collectors.md</code> for why).
+          </p>
+          <button class="btn btn-primary" id="check-foreground">Check now</button>
+          <div id="foreground-content" class="clipboard-box" style="display:none;"></div>
+        </div>
+      </section>
+
+      <!-- ENVIRONMENT -->
+      <section class="view" id="view-environment">
+        <header class="view-header">
+          <h1>Environment Variables</h1>
+          <div class="header-actions">
+            <input type="search" id="environment-search" placeholder="Filter…" />
+            <button class="btn btn-primary" id="refresh-environment">Refresh</button>
+          </div>
+        </header>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th colspan="3">Value</th></tr></thead>
+            <tbody id="environment-table-body">
+              <tr><td colspan="4" class="empty-row">Click Refresh to load environment variables.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- IDLE TIME -->
+      <section class="view" id="view-idle">
+        <header class="view-header">
+          <h1>Idle Time</h1>
+        </header>
+        <div class="panel">
+          <div class="card-value" id="idle-value" style="margin-bottom:10px;">—</div>
+          <button class="btn btn-primary" id="check-idle">Check now</button>
         </div>
       </section>
 

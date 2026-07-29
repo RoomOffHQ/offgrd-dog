@@ -49,6 +49,14 @@ function stubFor(command) {
     case "list_named_pipes":
     case "list_installed_programs":
       return [];
+    case "list_local_accounts":
+    case "list_network_shares":
+    case "list_environment_variables":
+    case "list_dns_cache":
+      return [];
+    case "get_foreground_window":
+    case "get_idle_state":
+      return null;
     case "get_clipboard_snapshot":
       return null;
     case "get_monitoring_mode":
@@ -472,6 +480,54 @@ const simpleViews = {
       <td class="mono">${escapeHtml(row.install_location || "-")}</td>
     `,
   },
+  accounts: {
+    command: "list_local_accounts",
+    searchId: "accounts-search",
+    bodyId: "accounts-table-body",
+    columns: 4,
+    matches: (row, q) => row.name.toLowerCase().includes(q),
+    renderRow: (row) => `
+      <td class="mono">${escapeHtml(row.kind)}</td>
+      <td>${escapeHtml(row.name)}</td>
+      <td class="mono">${row.disabled === true ? "yes" : row.disabled === false ? "no" : "-"}</td>
+      <td>${escapeHtml(row.comment || "-")}</td>
+    `,
+  },
+  shares: {
+    command: "list_network_shares",
+    searchId: "shares-search",
+    bodyId: "shares-table-body",
+    columns: 4,
+    matches: (row, q) => row.share_name.toLowerCase().includes(q),
+    renderRow: (row) => `
+      <td class="mono">${escapeHtml(row.share_name)}</td>
+      <td class="mono">${escapeHtml(row.local_path || "-")}</td>
+      <td colspan="2">${escapeHtml(row.comment || "-")}</td>
+    `,
+  },
+  "dns-cache": {
+    command: "list_dns_cache",
+    searchId: "dns-cache-search",
+    bodyId: "dns-cache-table-body",
+    columns: 4,
+    matches: (row, q) => row.hostname.toLowerCase().includes(q),
+    renderRow: (row) => `
+      <td class="mono">${escapeHtml(row.hostname)}</td>
+      <td class="mono">${escapeHtml(row.record_type)}</td>
+      <td class="mono" colspan="2">${escapeHtml(row.data)}</td>
+    `,
+  },
+  environment: {
+    command: "list_environment_variables",
+    searchId: "environment-search",
+    bodyId: "environment-table-body",
+    columns: 4,
+    matches: (row, q) => row.name.toLowerCase().includes(q) || row.value.toLowerCase().includes(q),
+    renderRow: (row) => `
+      <td class="mono">${escapeHtml(row.name)}</td>
+      <td class="mono" colspan="3">${escapeHtml(row.value)}</td>
+    `,
+  },
 };
 
 const simpleViewData = {}; // viewKey -> last-fetched rows, for client-side filtering
@@ -516,6 +572,52 @@ function setupSimpleViews() {
     document
       .getElementById(config.searchId)
       .addEventListener("input", () => renderSimpleView(viewKey));
+  }
+}
+
+// ---------- Foreground window (one-shot, never continuous) ----------
+
+async function checkForeground() {
+  const box = document.getElementById("foreground-content");
+  setConnectionStatus("loading");
+  try {
+    const result = await callBackend("get_foreground_window");
+    box.style.display = "block";
+    if (!result) {
+      box.textContent = "No foreground window detected.";
+    } else {
+      box.innerHTML = `
+        <div><strong>Title:</strong> ${escapeHtml(result.window_title || "(no title)")}</div>
+        <div><strong>PID:</strong> ${result.pid ?? "-"}</div>
+        <div><strong>Process:</strong> ${escapeHtml(result.process_image_path || "-")}</div>
+      `;
+    }
+    setConnectionStatus("ok");
+  } catch (err) {
+    console.error(err);
+    setConnectionStatus("error");
+  }
+}
+
+// ---------- Idle time ----------
+
+async function checkIdle() {
+  setConnectionStatus("loading");
+  try {
+    const result = await callBackend("get_idle_state");
+    const el = document.getElementById("idle-value");
+    if (!result) {
+      el.textContent = "Unknown";
+    } else {
+      const s = result.idle_seconds;
+      const mins = Math.floor(s / 60);
+      const secs = s % 60;
+      el.textContent = mins > 0 ? `${mins}m ${secs}s idle` : `${secs}s idle`;
+    }
+    setConnectionStatus("ok");
+  } catch (err) {
+    console.error(err);
+    setConnectionStatus("error");
   }
 }
 
@@ -874,6 +976,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("export-alerts-json").addEventListener("click", exportAlertsJson);
   document.getElementById("export-alerts-csv").addEventListener("click", exportAlertsCsv);
   document.getElementById("reveal-clipboard").addEventListener("click", revealClipboard);
+  document.getElementById("check-foreground").addEventListener("click", checkForeground);
+  document.getElementById("check-idle").addEventListener("click", checkIdle);
 
   setupLiveEvents();
 
